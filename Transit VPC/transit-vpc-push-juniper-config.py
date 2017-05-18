@@ -553,6 +553,25 @@ def lambda_handler(event, context):
         log.error("PubKey Authentication Failed! Connecting with password")
         c.connect( hostname = vsrx_ip, username = config['USER_NAME'], password = config['PASSWORD'] )
         PubKeyAuth=False
+    #Need to handle the generic exception case which most likely happens due to single ssh connection restriction.
+    #If still no luck after 15 minutes, let it time out. 
+    except :
+        i = 0
+        while(time.time() - stime < 900):
+            i = i + 1
+            time.sleep(5)
+            try:
+                c.connect( hostname = vsrx_ip, username = config['USER_NAME'], pkey = k )
+                break
+            except:
+                pass
+        if(time.time() - stime < 900):
+            log.info("Connected to %s after %s retry(retries)", vsrx_name, i)
+        else:
+            log.info("Connection to %s timedout. Stopped retrying after 15 minutes", vsrx_name)
+            c.close()
+            raise ValueError( "Operation timed out!!" )
+
     log.info("--- %s seconds ---", (time.time() - stime))
     log.info("Connected to %s",vsrx_ip)
     ssh = c.invoke_shell()
@@ -570,6 +589,8 @@ def lambda_handler(event, context):
     pushConfig(ssh,vsrx_config)
     log.info("--- %s seconds ---", (time.time() - stime))
     ssh.close()
+    #Close the ssh client as well
+    c.close()
 
     return
     {
