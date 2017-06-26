@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "(SO0001) - Transit VPC: This template creates a dedicated transit VPC with Juniper VSRX for routing traffic. ***NOTE*** You must first subscribe to the appropriate Juniper VSRX marketplace BYOL or License Included AMI from the AWS Marketplace before you launch this template. Version 3",
+  "Description" : "(SO0001j) - Transit VPC: This template creates a dedicated transit VPC with Juniper VSRX for routing traffic. ***NOTE*** You must first subscribe to the appropriate Juniper VSRX marketplace BYOL or License Included AMI from the AWS Marketplace before you launch this template. Version 3",
 
   "Parameters" : {
     "KeyName" : {
