@@ -19,6 +19,7 @@ import ast
 import time
 import os
 import string
+import ipaddress
 import logging
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -116,11 +117,8 @@ def getExistingTunnelId(ssh, vpn_connection_id, tvar):
 #Generic logic to push pre-generated config to the router
 def pushConfig(ssh, config):
     #log.info("Starting to push config")
-    #ssh.send('term len 0\n')
-    #prompt(ssh)
-    #CISCO --ssh.send('config t\n')
     ssh.send('edit\n')
-    log.debug("%s", prompt(ssh))
+    log.info("%s", prompt(ssh))
     stime = time.time()
     for line in config:
         if line == "WAIT":
@@ -177,9 +175,13 @@ def downloadPrivateKey(bucket_name, bucket_prefix, s3_url, prikey):
     log.info("Downloading private key: %s/%s/%s%s",s3_url, bucket_name, bucket_prefix, prikey)
     s3.download_file(bucket_name,bucket_prefix+prikey, '/tmp/'+prikey)
 
-#Logic to create the appropriate Sysco configuration
-def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, ssh):
+#Logic to create the appropriate Juniper configuration
+def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
     log.info("Processing %s/%s", bucket_name, bucket_key)
+
+    #Determine the next hop ip address for the ge0/0/0 interface
+    vsrx_subnet = (ipaddress.ip_network(unicode(subnet)))
+    next_hop = vsrx_subnet.network_address + 1
 
     #Download the VPN configuration XML document
     s3=boto3.client('s3',endpoint_url=s3_url,
@@ -262,6 +264,8 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, ssh):
         config_text = []
         config_text.append('cli \n')
         config_text.append('configure \n')
+        log.info("next hop ip address %s", next_hop)
+        config_text.append('set routing-instances ge-routing routing-options static route 0/0 next-hop {}'.format(next_hop))
 
         ipsec_tunnel_var = 0
           # Create tunnel specific configuration
@@ -353,6 +357,7 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, ssh):
             config_text.append('set security ike proposal ike-prop-{}-{} encryption-algorithm aes-128-cbc'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('set security ike proposal ike-prop-{}-{} lifetime-seconds 28800'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('set security ike proposal ike-prop-{}-{} dh-group group2'.format(vpn_connection_id,ipsec_tunnel_var))
+            log.info(config_text)
 
 # An IKE policy is established to associate a Pre Shared Key with the  
 # defined proposal.
@@ -528,9 +533,11 @@ def lambda_handler(event, context):
     config = getTransitConfig(bucket_name, bucket_prefix, endpoint_url[bucket_region], config_file)
     if 'VSRX1' in bucket_key:
         vsrx_ip=config['PIP1']
+        vsrx_subnet=config['SUB1']
         vsrx_name='VSRX1'
     else:
         vsrx_ip=config['PIP2']
+        vsrx_subnet=config['SUB2']
         vsrx_name='VSRX2'
     log.info("--- %s seconds ---", (time.time() - stime))
     #Download private key file from secure S3 bucket
@@ -582,9 +589,10 @@ def lambda_handler(event, context):
     log.info("endpoint_url[bucket_region]: %s", endpoint_url[bucket_region])
     log.info("config['BGP_ASN']: %s", config['BGP_ASN'])
     stime = time.time()
-    vsrx_config = create_jnpr_config(bucket_name, bucket_key, endpoint_url[bucket_region], config['BGP_ASN'], ssh)
+    vsrx_config = create_jnpr_config(bucket_name, bucket_key, endpoint_url[bucket_region], config['BGP_ASN'], vsrx_subnet, ssh)
     log.info("--- %s seconds ---", (time.time() - stime))
     log.info("Pushing config to router.")
+    log.info("%s",prompt(ssh))
     stime = time.time()
     pushConfig(ssh,vsrx_config)
     log.info("--- %s seconds ---", (time.time() - stime))
