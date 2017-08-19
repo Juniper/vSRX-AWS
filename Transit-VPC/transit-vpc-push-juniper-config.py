@@ -230,14 +230,15 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
     # Create or delete the VRF for this connection
     if vpn_status == 'delete':    
         config_text = []
-        #config_text.append('cli \n')
-        #config_text.append('configure \n')
+        config_text.append('cli \n')
+        config_text.append('configure \n')
 
         ipsec_tunnel_var = 0
         for ipsec_tunnel in vpn_connection.getElementsByTagName("ipsec_tunnel"):
             ipsec_tunnel_var += 1
             tunnelId=getExistingTunnelId(ssh,vpn_connection_id,ipsec_tunnel_var)
             if tunnelId == 0:
+                ssh.send('exit\n')
                 return
 
             config_text.append('delete security ike proposal ike-prop-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
@@ -258,8 +259,9 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
             config_text.append('delete security policies global policy intervpn match to-zone vpc-{}'.format(vpn_connection_id))
             config_text.append('delete security policies global policy vpc-2-dc match from-zone vpc-{}'.format(vpn_connection_id))
             config_text.append('delete security policies global policy dc-2-vpc match to-zone vpc-{}'.format(vpn_connection_id))
+        ssh.send('exit\n')
         
-      #------Juniper Delete-----#
+      #------Juniper Create-----#
     else:
         config_text = []
         config_text.append('cli \n')
