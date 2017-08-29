@@ -16,7 +16,7 @@
   "Mappings" : {
     "Function" : {
       "Poller" : { 
-	"CodeLocation" : "solutions-reference/transit-vpc/v3/transit-vpc-poller.py",
+	"CodeLocation" : "juniper-transit-vpc-solution/transit-vpc-poller.py",
 	"Name" : "vgw-poller",
         "Description": "Transit VPC: Poller function responsible for identifying specifically tagged VGWs and creating VPN connections to transit VPC.",
         "Runtime": "python2.7",
@@ -144,12 +144,8 @@
                 },
 		{
 		  "Effect": "Allow",
-		  "Action": [
-                    "s3:PutObject",
-                    "s3:PutObjectAcl",
-                    "s3:GetObject"
-		  ],
-		  "Resource": { "Fn::Join": ["", ["arn:aws:s3:::", { "Ref" : "BucketName" }, "/", {"Ref": "BucketPrefix"}, "*" 	]] }
+		  "Action": "s3:*",
+                  "Resource": "*"
 	       }
 	     ]
           }
