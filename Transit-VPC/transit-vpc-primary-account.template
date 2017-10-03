@@ -176,8 +176,8 @@
     "JunipervSRXAMI" : {
       "us-east-1"      : { "BYOL" : "ami-4ca1fc37", "LicenseIncluded" : "ami-6119471a" },
       "us-east-2"      : { "BYOL" : "ami-00230365", "LicenseIncluded" : "ami-14311171" },
-      "us-west-2"      : { "BYOL" : "ami-d98518b9", "LicenseIncluded" : "ami-71b8a208" },
-      "us-west-1"      : { "BYOL" : "ami-3542584c", "LicenseIncluded" : "ami-db4d65bb" },
+      "us-west-2"      : { "BYOL" : "ami-3542584c", "LicenseIncluded" : "ami-71b8a208" },
+      "us-west-1"      : { "BYOL" : "ami-9186aff1", "LicenseIncluded" : "ami-db4d65bb" },
       "ca-central-1"   : { "BYOL" : "ami-ab04bbcf", "LicenseIncluded" : "ami-d60eb1b2" },
       "eu-west-1"      : { "BYOL" : "ami-2117ff58", "LicenseIncluded" : "ami-ef3bd096" },
       "eu-west-2"      : { "BYOL" : "ami-d76f7eb3", "LicenseIncluded" : "ami-3c021358" },
