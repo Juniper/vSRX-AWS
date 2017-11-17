@@ -9,6 +9,13 @@
       "Type" : "String",
       "Default" : "Paste your public key here"
     },
+    "AllowedSshIpAddress" : {
+      "Description" : "Source IP address (CIDR notation) from which SSH to vSRXs is allowed",
+      "Type" : "String",
+      "Default" : "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "Enter valid CIDR to allow SSH to vSRX(s). Must be a valid IP CIDR range of the form x.x.x.x/x"
+    },
     "TerminationProtection" : {
       "Description" : "Enable termination protection on the VSRX EC2 instances to avoid accidential VSRX termination?",
       "Type" : "String",
@@ -61,7 +68,7 @@
       "Default" : "200.0.2.0/24"
     },
     "VSRXType" : {
-      "Description" : "Maximum network througput required for VSRX instances.",
+      "Description" : "Virtual machine size required for VSRX instances.",
       "Type" : "String",
       "Default" : "C4.Xlarge",
       "AllowedValues" : [ "C4.Xlarge" ]
@@ -81,15 +88,6 @@
       "Description" : "Another AWS Account ID to authorize access to VPN Config S3 bucket (for example bucket and KMS key policies).",
       "Type" : "String",
       "Default" : ""
-    },
-    "SendAnonymousData": {
-        "Description": "Choose to send anonymous data to AWS.",
-        "Type": "String",
-        "Default": "Yes",
-        "AllowedValues": [
-            "Yes",
-            "No"
-        ]
     }
   },
   "Conditions" : {
@@ -99,8 +97,7 @@
         ""
     ]}
     ]},
-   "EnableTerm" : {"Fn::Equals" : [{"Ref" : "TerminationProtection"}, "Yes"]},
-   "SendData" : {"Fn::Equals" : [{"Ref" : "SendAnonymousData"}, "Yes"]}
+   "EnableTerm" : {"Fn::Equals" : [{"Ref" : "TerminationProtection"}, "Yes"]}
   },
   "Metadata" : {
     "AWS::CloudFormation::Interface" : {
@@ -115,11 +112,7 @@
       },
       {
         "Label" : { "default" : "Network Configuration" },
-        "Parameters" : [ "VpcCidr", "PubSubnet11", "PubSubnet12", "PubSubnet21","PubSubnet22", "BgpAsn","SpokeTag","SpokeTagValue","PreferredPathTag" ]
-      },
-      {
-        "Label": { "default": "Anonymous Metrics Request" },
-        "Parameters": [ "SendAnonymousData" ]
+        "Parameters" : [ "VpcCidr", "AllowedSshIpAddress", "PubSubnet11", "PubSubnet12", "PubSubnet21","PubSubnet22", "BgpAsn","SpokeTag","SpokeTagValue","PreferredPathTag" ]
       }
      ],
      "ParameterLabels" : {
@@ -127,12 +120,13 @@
       "SpokeTag" : { "default" : "Spoke VPC Tag Name" },
       "SpokeTagValue" : { "default" : "Spoke VPC Tag Value" },
       "PreferredPathTag" : { "default" : "Preferred VPN Endpoint Tag Name" },
+      "AllowedSshIpAddress" : { "default" : "Allowed IP Address to SSH from" },
       "VpcCidr" : { "default" : "Transit VPC CIDR Block" },
       "PubSubnet11" : { "default" : "vSRX1- 1st Subnet Network" },
       "PubSubnet12" : { "default" : "vSRX1- 2nd Subnet Network" },
       "PubSubnet21" : { "default" : "vSRX2- 1st Subnet Network" },
       "PubSubnet22" : { "default" : "vSRX2- 2nd Subnet Network" },
-      "VSRXType" : { "default" : "VSRX Throughput Requirements" },
+      "VSRXType" : { "default" : "vSRX Instance Size" },
       "SshPublicKey" : { "default" : "SSH Key to access VSRX" },
       "S3Prefix" : { "default" : "Prefix for S3 Objects" },
       "LicenseModel" : { "default" : "License Model" },
@@ -277,6 +271,13 @@
             "Resource": "*"
           } ]
         }
+      }
+    },
+    "TransitVPCKeyAlias" : {
+      "Type" : "AWS::KMS::Alias",
+      "Properties" : {
+      "AliasName" : "alias/TransitVPCKey",
+      "TargetKeyId" : {"Ref":"KMSKey"}
       }
     },
     "TransitVPC" : {
@@ -526,6 +527,7 @@
 "groups {",
     "transit-vpc {",
         "system {",
+            "host-name tvpc-vsrx1;",
             "root-authentication {",
                 "encrypted-password \"$1$ZUlES4dp$OUwWo1g7cLoV/aMWpHUnC/\"; ## SECRET-DATA",
                 {"Fn::Join": ["", ["ssh-rsa ", "\"", "ssh-rsa ", { "Fn::GetAtt" : [ "CreateRsaKey", "PubKey" ]}, "\"", "; ", "## SECRET-DATA"]]},
@@ -569,6 +571,7 @@
 "}",
 "apply-groups transit-vpc;",
 "system {",
+    "host-name tvpc-vsrx1;",
     "root-authentication {",
         "encrypted-password \"$5$EZJ9ab2R$aSIQgSH5G0mcuHvmiN1U.TzEhIF0zyerQEHmo/JI3m3\"; ## SECRET-DATA",
     "}",
@@ -816,6 +819,7 @@
 "groups {",
     "transit-vpc {",
         "system {",
+            "host-name tvpc-vsrx2;",
             "root-authentication {",
                 "encrypted-password \"$1$ZUlES4dp$OUwWo1g7cLoV/aMWpHUnC/\"; ## SECRET-DATA",
                 {"Fn::Join": ["", ["ssh-rsa ", "\"", "ssh-rsa ", { "Fn::GetAtt" : [ "CreateRsaKey", "PubKey" ]}, "\"", "; ", "## SECRET-DATA"]]},
@@ -859,6 +863,7 @@
 "}",
 "apply-groups transit-vpc;",
 "system {",
+    "host-name tvpc-vsrx2;",
     "root-authentication {",
         "encrypted-password \"$5$EZJ9ab2R$aSIQgSH5G0mcuHvmiN1U.TzEhIF0zyerQEHmo/JI3m3\"; ## SECRET-DATA",
     "}",
@@ -1310,7 +1315,6 @@
         "'SSEKMSKeyId' : 'arn:aws:kms:",{"Ref" : "AWS::Region"},":",{ "Ref" : "AWS::AccountId" }, ":key/", { "Ref" : "KMSKey" }, "', ", 
         "'Body': \"{",
             "'UUID':'",{"Fn::GetAtt": [ "CreateUniqueID", "UUID" ] },"',",
-            "'SENDDATA':'",{"Ref" : "SendAnonymousData"},"',",
             "'EIP1':'",{ "Ref" : "vSRXEip12" },"',",
             "'EIP2':'",{ "Ref" : "vSRXEip22" },"',",
             "'PIP1':'",{ "Fn::GetAtt" : [ "VpcvSRX1", "PrivateIp" ] },"',",
@@ -1437,10 +1441,31 @@
         "GroupDescription" : "VSRX Security Group Rules",
         "VpcId" : { "Ref" : "TransitVPC" },
         "SecurityGroupIngress" : [
-           { "IpProtocol" : "tcp", "FromPort" : "22",  "ToPort" : "22",  "CidrIp" : "0.0.0.0/0" }
+           { "IpProtocol" : "tcp", "FromPort" : "22",  "ToPort" : "22",  "CidrIp" : { "Ref" : "AllowedSshIpAddress" } }, 
+           { "IpProtocol" : "icmp", "FromPort" : "8", "ToPort" : "-1", "CidrIp" : { "Ref" : "AllowedSshIpAddress" } }
            ],
         "SecurityGroupEgress" : [
-           { "IpProtocol" : "-1", "FromPort" : "0", "ToPort" : "65535", "CidrIp" : "0.0.0.0/0" } ]
+           { "IpProtocol" : "-1", "FromPort" : "0", "ToPort" : "65535", "CidrIp" : "0.0.0.0/0" }]
+      }
+    },
+    "SSHtoVSRXSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+          "IpProtocol": "tcp",
+          "FromPort": "22",
+          "ToPort": "22",
+          "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "JuniperConfigSecurityGroup",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "VSRXSecurityGroup",
+            "GroupId"
+          ]
+        }
       }
     },
     "JuniperConfigSecurityGroup" : {
@@ -1522,22 +1547,6 @@
              "Region": { "Ref": "AWS::Region" },
              "CreateUniqueID": "true"
          }
-    },
-    "SendingData": {
-        "Type": "Custom::LoadLambda",
-        "Condition" : "SendData",
-        "Properties": {
-            "ServiceToken": { "Fn::GetAtt": ["SolutionHelper", "Arn"] },
-            "SendAnonymousData": { "Fn::Join": ["", [
-                "{ 'Solution' : '", "SO0001", "', ",
-                  "'UUID' : '", {"Fn::GetAtt": ["CreateUniqueID", "UUID"]}, "', ",
-                  "'Data': {", "'VSRXType': '", {"Ref": "VSRXType"}, "',",
-                               "'LicenseModel': '", {"Ref": "LicenseModel"}, "'",
-                          "}",
-                "}"
-              ]]
-            }
-        }
     }
   },
   "Outputs" : {
