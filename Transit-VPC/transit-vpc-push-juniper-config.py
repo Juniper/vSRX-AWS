@@ -32,6 +32,7 @@ endpoint_url = {
     "us-west-1" : "https://s3-us-west-1.amazonaws.com",
     "us-west-2" : "https://s3-us-west-2.amazonaws.com",
     "eu-west-1" : "https://s3-eu-west-1.amazonaws.com",
+    "eu-west-2" : "https://s3-eu-west-2.amazonaws.com",
     "eu-central-1" : "https://s3-eu-central-1.amazonaws.com",
     "ap-northeast-1" : "https://s3-ap-northeast-1.amazonaws.com",
     "ap-northeast-2" : "https://s3-ap-northeast-2.amazonaws.com",

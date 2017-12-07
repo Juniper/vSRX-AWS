@@ -187,6 +187,7 @@
     "PrefixListIdMap" : {
       "ap-south-1" : { "s3" : "pl-78a54011" },
       "eu-west-1" : { "s3" : "pl-6da54004" },
+      "eu-west-2" : { "s3" : "pl-7ca54015" },
       "ap-southeast-1" : { "s3" : "pl-6fa54006" },
       "ap-southeast-2" : { "s3" : "pl-6ca54005" },
       "eu-central-1" : { "s3" : "pl-6ea54007" },
