@@ -246,8 +246,8 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
             config_text.append('delete security ike gateway gw-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security zones security-zone vpc-{}'.format(vpn_connection_id,tunnelId))
             config_text.append('delete interfaces st0 unit {}'.format(tunnelId))
-            config_text.append('delete security ipsec proposal ipsec-prop-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('delete security ipsec policy ipsec-pol-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('delete security ipsec proposal ipsec-pr-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('delete security ipsec policy ipsec-po-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security ipsec vpn {}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete routing-instances vpc-{}'.format(vpn_connection_id))
             config_text.append('delete routing-instances transit routing-options instance-import policy-{}'.format(vpn_connection_id))
@@ -403,21 +403,21 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
 # lifetime parameters for our IPSec security association.
 # Please note, you may use these additionally supported IPSec parameters for encryption like AES256 and other DH groups like 1,2, 5, 14-18, 22, 23, and 24.  
 #
-            config_text.append('set security ipsec proposal ipsec-prop-{}-{} protocol esp'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ipsec proposal ipsec-prop-{}-{} authentication-algorithm hmac-sha1-96'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ipsec proposal ipsec-prop-{}-{} encryption-algorithm aes-128-cbc'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ipsec proposal ipsec-prop-{}-{} lifetime-seconds 3600'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ipsec proposal ipsec-pr-{}-{} protocol esp'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ipsec proposal ipsec-pr-{}-{} authentication-algorithm hmac-sha1-96'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ipsec proposal ipsec-pr-{}-{} encryption-algorithm aes-128-cbc'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ipsec proposal ipsec-pr-{}-{} lifetime-seconds 3600'.format(vpn_connection_id,ipsec_tunnel_var))
 
 # The IPSec policy incorporates the Diffie-Hellman group and the IPSec
 # proposal.
 #
-            config_text.append('set security ipsec policy ipsec-pol-{}-{} perfect-forward-secrecy keys group2'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ipsec policy ipsec-pol-{}-{} proposals ipsec-prop-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ipsec policy ipsec-po-{}-{} perfect-forward-secrecy keys group2'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ipsec policy ipsec-po-{}-{} proposals ipsec-pr-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
 
 # A security association is defined here.
 #
             config_text.append('set security ipsec vpn {}-{} ike gateway gw-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ipsec vpn {}-{} ike ipsec-policy ipsec-pol-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ipsec vpn {}-{} ike ipsec-policy ipsec-po-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
             config_text.append('set security ipsec vpn {}-{} df-bit clear'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('set security ipsec vpn {}-{} establish-tunnels immediately'.format(vpn_connection_id,ipsec_tunnel_var))
 
