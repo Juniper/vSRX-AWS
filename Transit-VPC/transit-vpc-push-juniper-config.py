@@ -241,8 +241,8 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
                 ssh.send('exit\n')
                 return
 
-            config_text.append('delete security ike proposal ike-prop-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('delete security ike policy ike-pol-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('delete security ike proposal ike-pr-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('delete security ike policy ike-po-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security ike gateway gw-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security zones security-zone vpc-{}'.format(vpn_connection_id,tunnelId))
             config_text.append('delete interfaces st0 unit {}'.format(tunnelId))
@@ -354,19 +354,19 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
 # The address of the external interface for your customer gateway must be a static address. 
 # To ensure that NAT traversal (NAT-T) can function, you must adjust your firewall rules to unblock UDP port 4500. If not behind NAT, we recommend disabling NAT-T.
 #
-            config_text.append('set security ike proposal ike-prop-{}-{} authentication-method pre-shared-keys'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ike proposal ike-prop-{}-{} authentication-algorithm sha1'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ike proposal ike-prop-{}-{} encryption-algorithm aes-128-cbc'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ike proposal ike-prop-{}-{} lifetime-seconds 28800'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ike proposal ike-prop-{}-{} dh-group group2'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike proposal ike-pr-{}-{} authentication-method pre-shared-keys'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike proposal ike-pr-{}-{} authentication-algorithm sha1'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike proposal ike-pr-{}-{} encryption-algorithm aes-128-cbc'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike proposal ike-pr-{}-{} lifetime-seconds 28800'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike proposal ike-pr-{}-{} dh-group group2'.format(vpn_connection_id,ipsec_tunnel_var))
             log.info(config_text)
 
 # An IKE policy is established to associate a Pre Shared Key with the  
 # defined proposal.
 #  
-            config_text.append('set security ike policy ike-pol-{}-{} mode main'.format(vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ike policy ike-pol-{}-{} proposals ike-prop-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
-            config_text.append('set security ike policy ike-pol-{}-{} pre-shared-key ascii-text {}'.format(vpn_connection_id,ipsec_tunnel_var,ike_pre_shared_key))
+            config_text.append('set security ike policy ike-po-{}-{} mode main'.format(vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike policy ike-po-{}-{} proposals ike-pr-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike policy ike-po-{}-{} pre-shared-key ascii-text {}'.format(vpn_connection_id,ipsec_tunnel_var,ike_pre_shared_key))
 
 # The IKE gateway is defined to be the Virtual Private Gateway. The gateway 
 # configuration associates a local interface, remote IP address, and
@@ -379,7 +379,7 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
 #
 # If the address changes, the Customer Gateway and VPN Connection must be recreated.
 #
-            config_text.append('set security ike gateway gw-{}-{} ike-policy ike-pol-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
+            config_text.append('set security ike gateway gw-{}-{} ike-policy ike-po-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_connection_id,ipsec_tunnel_var))
             config_text.append('set security ike gateway gw-{}-{} external-interface ge-0/0/0.0'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('set security ike gateway gw-{}-{} address {}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_gateway_tunnel_outside_address))
             config_text.append('set security ike gateway gw-{}-{} no-nat-traversal'.format(vpn_connection_id,ipsec_tunnel_var))
