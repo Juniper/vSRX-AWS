@@ -1,0 +1,290 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "(SO0001) - This template creates a Juniper vSRX instance ***NOTE*** You must first subscribe to the appropriate Juniper VSRX marketplace AMI from the before you launch this template. Version 3",
+
+  "Parameters" : {
+    "KeyName" : {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Type" : "AWS::EC2::KeyPair::KeyName",
+      "Default" : "Lab"
+    },
+    "AllowedSshIpAddress" : {
+      "Description" : "Source IP address (CIDR notation) from which SSH to vSRXs is allowed",
+      "Type" : "String",
+      "Default" : "0.0.0.0/0"
+    },
+    "TerminationProtection" : {
+      "Description" : "Enable termination protection on the VSRX EC2 instances to avoid accidential VSRX termination?",
+      "Type" : "String",
+      "Default" : "Yes",
+      "AllowedValues" : ["Yes", "No"]
+    },
+    "VpcCidr" : {
+      "Description" : "CIDR block for vSRX VPC.",
+      "Type" : "String",
+      "Default" : "200.0.0.0/16"
+    },
+    "PubSubnet1" : {
+      "Description" : "Address range for vSRX VPC management subnet.",
+      "Type" : "String",
+      "Default" : "200.0.254.0/24"
+    },
+    "PubSubnet2" : {
+      "Description" : "Address range for vSRX VPC data subnet to be created in AZ1.",
+      "Type" : "String",
+      "Default" : "200.0.1.0/24"
+    },
+    "VSRXType" : {
+      "Description" : "Virtual machine size required for VSRX instances.",
+      "Type" : "String",
+      "Default" : "C4.Xlarge",
+      "AllowedValues" : [ "C4.Xlarge" ]
+    }
+  },
+  "Conditions" : {
+   "EnableTerm" : {"Fn::Equals" : [{"Ref" : "TerminationProtection"}, "Yes"]}
+  },
+  "Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+     "ParameterGroups" : [
+      {
+        "Label" : { "default":"Juniper VSRX Configuration" },
+        "Parameters" : [ "VSRXType", "KeyName", "TerminationProtection" ]
+      },
+      {
+        "Label" : { "default" : "Network Configuration" },
+        "Parameters" : [ "VpcCidr", "AllowedSshIpAddress", "PubSubnet1", "PubSubnet2"  ]
+      }
+     ],
+     "ParameterLabels" : {
+      "AllowedSshIpAddress" : { "default" : "Allowed IP Address to SSH from" },
+      "VpcCidr" : { "default" : "vSRX VPC CIDR Block" },
+      "PubSubnet1" : { "default" : "vSRX1- Management Subnet Network" },
+      "PubSubnet2" : { "default" : "vSRX1- Data Subnet Network" },
+      "VSRXType" : { "default" : "vSRX Instance Size" },
+      "KeyName" : { "default" : "SSH Key to access VSRX" },
+      "TerminationProtection" : { "default" : "Enable Termination Protection" }
+     }
+    }
+  },
+  "Mappings" : {
+    
+    "JunipervSRXAMI" : {
+      "us-east-1"      : { "byol" : "ami-40058d3a" },
+      "us-east-2"      : { "byol" : "ami-e6a18983" },
+      "us-west-2"      : { "byol" : "ami-cddd71b5" },
+      "us-west-1"      : { "byol" : "ami-9186aff1" },
+      "ca-central-1"   : { "byol" : "ami-ab04bbcf" },
+      "eu-west-1"      : { "byol" : "ami-2117ff58" },
+      "eu-west-2"      : { "byol" : "ami-d76f7eb3" },
+      "eu-central-1"   : { "byol" : "ami-f8fd7f97" },
+      "ap-south-1"     : { "byol" : "ami-26f68e49" },
+      "ap-southeast-1" : { "byol" : "ami-c5a331a6" },
+      "ap-southeast-2" : { "byol" : "ami-14c1de77" },
+      "ap-northeast-1" : { "byol" : "ami-02729164" },
+      "ap-northeast-2" : { "byol" : "ami-2bbe6745" },
+      "sa-east-1"      : { "byol" : "ami-0656216a" } 
+
+    },
+    "PrefixListIdMap" : {
+      "ap-south-1" : { "s3" : "pl-78a54011" },
+      "eu-west-1" : { "s3" : "pl-6da54004" },
+      "ap-southeast-1" : { "s3" : "pl-6fa54006" },
+      "ap-southeast-2" : { "s3" : "pl-6ca54005" },
+      "eu-central-1" : { "s3" : "pl-6ea54007" },
+      "ap-northeast-2" : { "s3" : "pl-78a54011" },
+      "ap-northeast-1" : { "s3" : "pl-61a54008" },
+      "us-east-1" : { "s3" : "pl-63a5400a" },
+      "us-east-2" : { "s3" : "pl-7ba54012" },
+      "sa-east-1" : { "s3" : "pl-6aa54003" },
+      "us-west-1" : { "s3" : "pl-6ba54002" },
+      "us-west-2" : { "s3" : "pl-68a54001" }
+    },
+    "vSRXInstance" : {
+      "C4.Xlarge"   : { "Type" : "c4.xlarge",   "Bandwidth" : "500000" }
+    }
+  },
+  "Resources" : {
+    "vSRXVPC" : {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "CidrBlock" : { "Ref" : "VpcCidr" },
+        "Tags" : [
+          { "Key" : "Name", "Value" : "vSRX VPC" }
+        ]
+      }
+    },
+
+    "VPCPubSub11" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "vSRXVPC" },
+        "CidrBlock" : { "Ref" : "PubSubnet1" },
+        "AvailabilityZone" : { "Fn::Select": ["0", {"Fn::GetAZs": ""}] },
+        "Tags" : [
+          { "Key" : "Network", "Value" : "Public" },
+          { "Key" : "Name", "Value" : "vSRX VPC Management Subnet 1" }
+        ]
+      }
+    },
+    "VPCPubSub12" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "vSRXVPC" },
+        "CidrBlock" : { "Ref" : "PubSubnet2" },
+        "AvailabilityZone" : { "Fn::Select": ["0", {"Fn::GetAZs": ""}] },
+        "Tags" : [
+          { "Key" : "Network", "Value" : "Public" },
+          { "Key" : "Name", "Value" : "vSRX VPC Data Subnet 1" }
+        ]
+      }
+    },
+    "IGW" : {
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags" : [
+          { "Key" : "Name", "Value" : "vSRX VPC IGW" }
+        ]
+      }
+    },
+    "IGWToInternet" : {
+       "Type" : "AWS::EC2::VPCGatewayAttachment",
+       "Properties" : {
+         "VpcId" : { "Ref" : "vSRXVPC" },
+         "InternetGatewayId" : { "Ref" : "IGW" }
+       }
+    },
+    "VPCRouteTable" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "vSRXVPC" },
+        "Tags" : [
+          { "Key" : "Network", "Value" : "Public" },
+          { "Key" : "Name", "Value" : "vSRX VPC" }
+        ]
+      }
+    },
+    "VPCPublicRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "VPCRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "IGW" }
+      }
+    },
+    "S3Endpoint" : {
+      "Type" : "AWS::EC2::VPCEndpoint",
+      "Properties" : {
+        "PolicyDocument" : {
+          "Version":"2012-10-17",
+          "Statement":[{
+            "Effect":"Allow",
+            "Principal": "*",
+            "Action":["s3:*"],
+            "Resource":["*"]
+          }]
+        },
+        "RouteTableIds" : [ {"Ref" : "VPCRouteTable"} ],
+        "ServiceName" : { "Fn::Join": [ "", [ "com.amazonaws.", { "Ref": "AWS::Region" }, ".s3" ] ] },
+        "VpcId" : {"Ref" : "vSRXVPC"}
+      }
+    },
+    "VPCPubSubnetRouteTableAssociation1" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "VPCPubSub11" },
+        "RouteTableId" : { "Ref" : "VPCRouteTable" }
+      }
+    },
+    "VPCPubSubnetRouteTableAssociation2" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "VPCPubSub12" },
+        "RouteTableId" : { "Ref" : "VPCRouteTable" }
+      }
+    },
+    "vSRXEip11" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "vSRXEip12" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "AssociateEIP11" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : [ "vSRXEip11", "AllocationId" ]},
+        "NetworkInterfaceId" : { "Ref" : "vSRXInterface11" }
+      }
+    },
+    "AssociateEIP12" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : [ "vSRXEip12", "AllocationId" ]},
+        "NetworkInterfaceId" : { "Ref" : "vSRXInterface12" }
+      }
+    },
+    "vSRXInterface11" : {
+      "Type" : "AWS::EC2::NetworkInterface",
+      "Properties" : {
+        "Description" : "vSRXRevenueInterface1",
+        "SourceDestCheck" : "false",
+        "GroupSet" : [ {"Ref" : "VSRXSecurityGroup"} ],
+        "SubnetId" : { "Ref" : "VPCPubSub11"}
+      }
+    },
+    "vSRXInterface12" : {
+      "Type" : "AWS::EC2::NetworkInterface",
+      "Properties" : {
+        "Description" : "vSRXRevenueInterface1",
+        "SourceDestCheck" : "false",
+        "GroupSet" : [ {"Ref" : "VSRXSecurityGroup"} ],
+        "SubnetId" : { "Ref" : "VPCPubSub12"}
+      }
+    },
+    "VpcvSRX1" : {
+      "Type" : "AWS::EC2::Instance",
+      "Metadata" : {
+        "Comment1" : "Launch Juniper VSRX1"
+      },
+      "Properties" : {
+        "InstanceType" : { "Fn::FindInMap" : [ "vSRXInstance", { "Ref" : "VSRXType" }, "Type"] },
+        "KeyName" : { "Ref" : "KeyName" },
+        "DisableApiTermination" : {"Fn::If": ["EnableTerm", true, false ]},
+        "ImageId"        : { "Fn::FindInMap" : [ "JunipervSRXAMI", { "Ref" : "AWS::Region" }, "byol" ] },
+        "NetworkInterfaces" : [ { "NetworkInterfaceId" : {"Ref" : "vSRXInterface11"}, "DeviceIndex" : "0" },
+                { "NetworkInterfaceId" : {"Ref" : "vSRXInterface12"}, "DeviceIndex" : "1" }],
+        "Tags" : [
+          { "Key" : "Name", "Value" : "VSRX1" }
+        ],
+       }, 
+      "DependsOn" : "IGW"
+    },
+    
+    "VSRXSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "VSRX Security Group Rules",
+        "VpcId" : { "Ref" : "vSRXVPC" },
+        "SecurityGroupIngress" : [
+           { "IpProtocol" : "tcp", "FromPort" : "22",  "ToPort" : "22",  "CidrIp" : { "Ref" : "AllowedSshIpAddress" } }, 
+           { "IpProtocol" : "icmp", "FromPort" : "8", "ToPort" : "-1", "CidrIp" : { "Ref" : "AllowedSshIpAddress" } }
+           ],
+        "SecurityGroupEgress" : [
+           { "IpProtocol" : "-1", "FromPort" : "0", "ToPort" : "65535", "CidrIp" : "0.0.0.0/0" }]
+      }
+    }
+  },
+  "Outputs" : {
+    "VSRXIPAddress" : {
+      "Description" : "Management IP Address for VSRX",
+      "Value" : { "Fn::GetAtt" : [ "VpcvSRX1", "PublicIp" ] } 
+    }
+  }
+}
