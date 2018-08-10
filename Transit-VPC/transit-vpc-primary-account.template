@@ -168,21 +168,20 @@
       }
     },
     "JunipervSRXAMI" : {
-      "us-east-1"      : { "BYOL" : "ami-4ca1fc37", "LicenseIncluded" : "ami-6119471a" },
-      "us-east-2"      : { "BYOL" : "ami-00230365", "LicenseIncluded" : "ami-14311171" },
-      "us-west-2"      : { "BYOL" : "ami-3542584c", "LicenseIncluded" : "ami-71b8a208" },
-      "us-west-1"      : { "BYOL" : "ami-9186aff1", "LicenseIncluded" : "ami-db4d65bb" },
-      "ca-central-1"   : { "BYOL" : "ami-ab04bbcf", "LicenseIncluded" : "ami-d60eb1b2" },
-      "eu-west-1"      : { "BYOL" : "ami-2117ff58", "LicenseIncluded" : "ami-ef3bd096" },
-      "eu-west-2"      : { "BYOL" : "ami-d76f7eb3", "LicenseIncluded" : "ami-3c021358" },
-      "eu-central-1"   : { "BYOL" : "ami-5bdf7334", "LicenseIncluded" : "ami-4761cd28" },
-      "ap-south-1"     : { "BYOL" : "ami-26f68e49", "LicenseIncluded" : "ami-46c1b929" },
-      "ap-southeast-1" : { "BYOL" : "ami-c5a331a6", "LicenseIncluded" : "ami-2cec714f" },
-      "ap-southeast-2" : { "BYOL" : "ami-14c1de77", "LicenseIncluded" : "ami-49b2ad2a" },
-      "ap-northeast-1" : { "BYOL" : "ami-02729164", "LicenseIncluded" : "ami-5f5fbd39" },
-      "ap-northeast-2" : { "BYOL" : "ami-2bbe6745", "LicenseIncluded" : "ami-3ca47d52" },
-      "sa-east-1"      : { "BYOL" : "ami-0656216a", "LicenseIncluded" : "ami-11a5d27d" }
-
+     "us-east-1" : { "BYOL" : "ami-4a09d335", "LicenseIncluded" : "ami-c80fd5b7" },
+     "us-east-2" : { "BYOL" : "ami-416a5924", "LicenseIncluded" : "ami-e8695a8d" },
+     "us-west-2" : { "BYOL" : "ami-7dc4a705", "LicenseIncluded" : "ami-1dc6a565" },
+     "us-west-1" : { "BYOL" : "ami-8f9182ef", "LicenseIncluded" : "ami-ea92818a" },
+     "ca-central-1" : { "BYOL" : "ami-90c342f4", "LicenseIncluded" : "ami-79c0411d" },
+     "eu-west-1" : { "BYOL" : "ami-d37155aa", "LicenseIncluded" : "ami-a97357d0" },
+     "eu-west-2" : { "BYOL" : "ami-5936d63e", "LicenseIncluded" : "ami-a235d5c5" },
+     "eu-central-1" : { "BYOL" : "ami-f45c071f", "LicenseIncluded" : "ami-dd520936" },
+     "ap-south-1" : { "BYOL" : "ami-6f735400", "LicenseIncluded" : "ami-4274532d" },
+     "ap-southeast-1" : { "BYOL" : "ami-dd0928a1", "LicenseIncluded" : "ami-d30928af" },
+     "ap-southeast-2" : { "BYOL" : "ami-a2bf77c0", "LicenseIncluded" : "ami-65b37b07" },
+     "ap-northeast-1" : { "BYOL" : "ami-48c0dc34", "LicenseIncluded" : "ami-0ec6da72" },
+     "ap-northeast-2" : { "BYOL" : "ami-faaa0494", "LicenseIncluded" : "ami-9ead03f0" },
+     "sa-east-1" : { "BYOL" : "ami-a6b6e7ca", "LicenseIncluded" : "ami-6eb7e602" }
     },
     "PrefixListIdMap" : {
       "ap-south-1" : { "s3" : "pl-78a54011" },
