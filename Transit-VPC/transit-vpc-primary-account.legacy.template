@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "(SO0001) - Transit VPC: This template creates a dedicated transit VPC with Juniper VSRX for routing traffic. ***NOTE*** You must first subscribe to the appropriate Juniper VSRX marketplace BYOL AMI from the AWS Marketplace before you launch this template. Version 3",
+  "Description" : "(SO0001) - Transit VPC: This template creates a dedicated transit VPC with Juniper VSRX for routing traffic. ***NOTE*** You must first subscribe to the appropriate Juniper VSRX marketplace BYOL or License Included AMI from the AWS Marketplace before you launch this template. Version 3",
 
   "Parameters" : {
     "SshPublicKey" : {
@@ -12,6 +12,7 @@
     "AllowedSshIpAddress" : {
       "Description" : "Source IP address (CIDR notation) from which SSH to vSRXs is allowed",
       "Type" : "String",
+      "Default" : "0.0.0.0/0",
       "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
       "ConstraintDescription": "Enter valid CIDR to allow SSH to vSRX(s). Must be a valid IP CIDR range of the form x.x.x.x/x"
     },
@@ -47,22 +48,22 @@
       "Default" : "200.0.0.0/16"
     },
     "PubSubnet11" : {
-      "Description" : "Address range for Transit VPC management subnet to be created in AZ1.",
+      "Description" : "Address range for Transit VPC subnet to be created in AZ1.",
       "Type" : "String",
       "Default" : "200.0.254.0/24"
     },
     "PubSubnet12" : {
-      "Description" : "Address range for Transit VPC data subnet to be created in AZ1.",
+      "Description" : "Address range for Transit VPC subnet to be created in AZ1.",
       "Type" : "String",
       "Default" : "200.0.1.0/24"
     },
     "PubSubnet21" : {
-      "Description" : "Address range for Transit VPC management subnet to be created in AZ2.",
+      "Description" : "Address range for Transit VPC subnet to be created in AZ2.",
       "Type" : "String",
       "Default" : "200.0.253.0/24"
     },
     "PubSubnet22" : {
-      "Description" : "Address range for Transit VPC data subnet to be created in AZ2.",
+      "Description" : "Address range for Transit VPC subnet to be created in AZ2.",
       "Type" : "String",
       "Default" : "200.0.2.0/24"
     },
@@ -71,6 +72,12 @@
       "Type" : "String",
       "Default" : "C4.Xlarge",
       "AllowedValues" : [ "C4.Xlarge" ]
+    },
+    "LicenseModel" : {
+      "Description" : "Choose between BYOL (Bring Your Own License) and License Included license models. Remember to first subscribe the the appropriate Marketplace AMI!",
+      "Type" : "String",
+      "Default" : "LicenseIncluded",
+      "AllowedValues" : ["LicenseIncluded", "BYOL"]
     },
     "S3Prefix" : {
       "Description" : "S3 prefix to append before S3 key names.",
@@ -97,7 +104,7 @@
      "ParameterGroups" : [
       {
         "Label" : { "default":"Juniper VSRX Configuration" },
-        "Parameters" : [ "VSRXType", "SshPublicKey", "TerminationProtection" ]
+        "Parameters" : [ "VSRXType", "SshPublicKey", "LicenseModel", "TerminationProtection" ]
       },
       {
         "Label" : { "default":"AWS Service Configuration" },
@@ -115,13 +122,14 @@
       "PreferredPathTag" : { "default" : "Preferred VPN Endpoint Tag Name" },
       "AllowedSshIpAddress" : { "default" : "Allowed IP Address to SSH from" },
       "VpcCidr" : { "default" : "Transit VPC CIDR Block" },
-      "PubSubnet11" : { "default" : "vSRX1- Management Subnet Network" },
-      "PubSubnet12" : { "default" : "vSRX1- Data Subnet Network" },
-      "PubSubnet21" : { "default" : "vSRX2- Management Subnet Network" },
-      "PubSubnet22" : { "default" : "vSRX2- Data Subnet Network" },
+      "PubSubnet11" : { "default" : "vSRX1- 1st Subnet Network" },
+      "PubSubnet12" : { "default" : "vSRX1- 2nd Subnet Network" },
+      "PubSubnet21" : { "default" : "vSRX2- 1st Subnet Network" },
+      "PubSubnet22" : { "default" : "vSRX2- 2nd Subnet Network" },
       "VSRXType" : { "default" : "vSRX Instance Size" },
       "SshPublicKey" : { "default" : "SSH Key to access VSRX" },
       "S3Prefix" : { "default" : "Prefix for S3 Objects" },
+      "LicenseModel" : { "default" : "License Model" },
       "TerminationProtection" : { "default" : "Enable Termination Protection" },
       "AccountId" : { "default" : "Additional AWS Account ID (Optional)" }
      }
@@ -160,20 +168,20 @@
       }
     },
     "JunipervSRXAMI" : {
-      "us-east-1"      : { "byol" : "ami-4ca1fc37" },
-      "us-east-2"      : { "byol" : "ami-00230365" },
-      "us-west-2"      : { "byol" : "ami-3542584c" },
-      "us-west-1"      : { "byol" : "ami-9186aff1" },
-      "ca-central-1"   : { "byol" : "ami-ab04bbcf" },
-      "eu-west-1"      : { "byol" : "ami-2117ff58" },
-      "eu-west-2"      : { "byol" : "ami-d76f7eb3" },
-      "eu-central-1"   : { "byol" : "ami-5bdf7334" },
-      "ap-south-1"     : { "byol" : "ami-26f68e49" },
-      "ap-southeast-1" : { "byol" : "ami-c5a331a6" },
-      "ap-southeast-2" : { "byol" : "ami-14c1de77" },
-      "ap-northeast-1" : { "byol" : "ami-02729164" },
-      "ap-northeast-2" : { "byol" : "ami-2bbe6745" },
-      "sa-east-1"      : { "byol" : "ami-0656216a" } 
+      "us-east-1"      : { "BYOL" : "ami-4ca1fc37", "LicenseIncluded" : "ami-6119471a" },
+      "us-east-2"      : { "BYOL" : "ami-00230365", "LicenseIncluded" : "ami-14311171" },
+      "us-west-2"      : { "BYOL" : "ami-3542584c", "LicenseIncluded" : "ami-71b8a208" },
+      "us-west-1"      : { "BYOL" : "ami-9186aff1", "LicenseIncluded" : "ami-db4d65bb" },
+      "ca-central-1"   : { "BYOL" : "ami-ab04bbcf", "LicenseIncluded" : "ami-d60eb1b2" },
+      "eu-west-1"      : { "BYOL" : "ami-2117ff58", "LicenseIncluded" : "ami-ef3bd096" },
+      "eu-west-2"      : { "BYOL" : "ami-d76f7eb3", "LicenseIncluded" : "ami-3c021358" },
+      "eu-central-1"   : { "BYOL" : "ami-5bdf7334", "LicenseIncluded" : "ami-4761cd28" },
+      "ap-south-1"     : { "BYOL" : "ami-26f68e49", "LicenseIncluded" : "ami-46c1b929" },
+      "ap-southeast-1" : { "BYOL" : "ami-c5a331a6", "LicenseIncluded" : "ami-2cec714f" },
+      "ap-southeast-2" : { "BYOL" : "ami-14c1de77", "LicenseIncluded" : "ami-49b2ad2a" },
+      "ap-northeast-1" : { "BYOL" : "ami-02729164", "LicenseIncluded" : "ami-5f5fbd39" },
+      "ap-northeast-2" : { "BYOL" : "ami-2bbe6745", "LicenseIncluded" : "ami-3ca47d52" },
+      "sa-east-1"      : { "BYOL" : "ami-0656216a", "LicenseIncluded" : "ami-11a5d27d" }
 
     },
     "PrefixListIdMap" : {
@@ -188,8 +196,7 @@
       "us-east-2" : { "s3" : "pl-7ba54012" },
       "sa-east-1" : { "s3" : "pl-6aa54003" },
       "us-west-1" : { "s3" : "pl-6ba54002" },
-      "us-west-2" : { "s3" : "pl-68a54001" },
-      "ca-central-1" : { "s3" : "pl-7da54014" }
+      "us-west-2" : { "s3" : "pl-68a54001" }
     },
     "vSRXInstance" : {
       "C4.Xlarge"   : { "Type" : "c4.xlarge",   "Bandwidth" : "500000" }
@@ -291,7 +298,7 @@
         "AvailabilityZone" : { "Fn::Select": ["0", {"Fn::GetAZs": ""}] },
         "Tags" : [
           { "Key" : "Network", "Value" : "Public" },
-          { "Key" : "Name", "Value" : "Transit VPC Management Subnet 1" }
+          { "Key" : "Name", "Value" : "Transit VPC Subnet1" }
         ]
       }
     },
@@ -303,7 +310,7 @@
         "AvailabilityZone" : { "Fn::Select": ["0", {"Fn::GetAZs": ""}] },
         "Tags" : [
           { "Key" : "Network", "Value" : "Public" },
-          { "Key" : "Name", "Value" : "Transit VPC Data Subnet 1" }
+          { "Key" : "Name", "Value" : "Transit VPC Subnet1" }
         ]
       }
     },
@@ -315,7 +322,7 @@
         "AvailabilityZone" : { "Fn::Select": ["1", {"Fn::GetAZs": ""}] },
         "Tags" : [
           { "Key" : "Network", "Value" : "Public" },
-          { "Key" : "Name", "Value" : "Transit VPC Management Subnet 2" }
+          { "Key" : "Name", "Value" : "Transit VPC Subnet2" }
         ]
       }
     },
@@ -327,7 +334,7 @@
         "AvailabilityZone" : { "Fn::Select": ["1", {"Fn::GetAZs": ""}] },
         "Tags" : [
           { "Key" : "Network", "Value" : "Public" },
-          { "Key" : "Name", "Value" : "Transit VPC Data Subnet 2" }
+          { "Key" : "Name", "Value" : "Transit VPC Subnet1" }
         ]
       }
     },
@@ -505,7 +512,7 @@
       "Properties" : {
         "InstanceType" : { "Fn::FindInMap" : [ "vSRXInstance", { "Ref" : "VSRXType" }, "Type"] },
         "DisableApiTermination" : {"Fn::If": ["EnableTerm", true, false ]},
-        "ImageId"        : { "Fn::FindInMap" : [ "JunipervSRXAMI", { "Ref" : "AWS::Region" }, "byol" ] },
+        "ImageId"        : { "Fn::FindInMap" : [ "JunipervSRXAMI", { "Ref" : "AWS::Region" }, { "Ref" : "LicenseModel" } ] },
         "NetworkInterfaces" : [ { "NetworkInterfaceId" : {"Ref" : "vSRXInterface11"}, "DeviceIndex" : "0" },
                 { "NetworkInterfaceId" : {"Ref" : "vSRXInterface12"}, "DeviceIndex" : "1" }],
         "Tags" : [
@@ -520,6 +527,7 @@
 "groups {",
     "transit-vpc {",
         "system {",
+            "host-name tvpc-vsrx1;",
             "root-authentication {",
                 "encrypted-password \"$1$ZUlES4dp$OUwWo1g7cLoV/aMWpHUnC/\"; ## SECRET-DATA",
                 {"Fn::Join": ["", ["ssh-rsa ", "\"", "ssh-rsa ", { "Fn::GetAtt" : [ "CreateRsaKey", "PubKey" ]}, "\"", "; ", "## SECRET-DATA"]]},
@@ -563,6 +571,7 @@
 "}",
 "apply-groups transit-vpc;",
 "system {",
+    "host-name tvpc-vsrx1;",
     "root-authentication {",
         "encrypted-password \"$5$EZJ9ab2R$aSIQgSH5G0mcuHvmiN1U.TzEhIF0zyerQEHmo/JI3m3\"; ## SECRET-DATA",
     "}",
@@ -795,7 +804,7 @@
       "Properties" : {
         "InstanceType" : { "Fn::FindInMap" : [ "vSRXInstance", { "Ref" : "VSRXType" }, "Type"] },
         "DisableApiTermination" : {"Fn::If": ["EnableTerm", true, false ]},
-        "ImageId"        : { "Fn::FindInMap" : [ "JunipervSRXAMI", { "Ref" : "AWS::Region" }, "byol" ] },
+        "ImageId"        : { "Fn::FindInMap" : [ "JunipervSRXAMI", { "Ref" : "AWS::Region" }, { "Ref" : "LicenseModel" } ] },
         "NetworkInterfaces" : [ { "NetworkInterfaceId" : {"Ref" : "vSRXInterface21"}, "DeviceIndex" : "0" },
                 { "NetworkInterfaceId" : {"Ref" : "vSRXInterface22"}, "DeviceIndex" : "1" }],
         "Tags" : [
@@ -810,6 +819,7 @@
 "groups {",
     "transit-vpc {",
         "system {",
+            "host-name tvpc-vsrx2;",
             "root-authentication {",
                 "encrypted-password \"$1$ZUlES4dp$OUwWo1g7cLoV/aMWpHUnC/\"; ## SECRET-DATA",
                 {"Fn::Join": ["", ["ssh-rsa ", "\"", "ssh-rsa ", { "Fn::GetAtt" : [ "CreateRsaKey", "PubKey" ]}, "\"", "; ", "## SECRET-DATA"]]},
@@ -853,6 +863,7 @@
 "}",
 "apply-groups transit-vpc;",
 "system {",
+    "host-name tvpc-vsrx2;",
     "root-authentication {",
         "encrypted-password \"$5$EZJ9ab2R$aSIQgSH5G0mcuHvmiN1U.TzEhIF0zyerQEHmo/JI3m3\"; ## SECRET-DATA",
     "}",
