@@ -31,6 +31,7 @@ endpoint_url = {
     "us-east-2" : "https://s3-us-east-2.amazonaws.com",
     "us-west-1" : "https://s3-us-west-1.amazonaws.com",
     "us-west-2" : "https://s3-us-west-2.amazonaws.com",
+    "ca-central-1" : "https://s3-ca-central-1.amazonaws.com",
     "eu-west-1" : "https://s3-eu-west-1.amazonaws.com",
     "eu-central-1" : "https://s3-eu-central-1.amazonaws.com",
     "ap-northeast-1" : "https://s3-ap-northeast-1.amazonaws.com",
@@ -50,9 +51,10 @@ def prompt(chan):
         #log.info("response: %s",resp)
     return buff
 
-# Logic to figure out the next availble tunnel
-def getNextTunnelId(ssh):
-    log.info('Start getNextTunnelId')
+# Logic to figure out the next availble tunnel, list of
+# policy statements and list of transit vpc virtual routers
+def getCurrentConfig(ssh):
+    log.info('Start getCurrentConfig')
     #ssh.send('set cli screen-length 0\n')
     #log.info("%s", prompt(ssh))
     #ssh.send('edit\n')
@@ -77,16 +79,37 @@ def getNextTunnelId(ssh):
             log.info("%s", line)
             lastTunnelNum = line.strip().partition(' ')[0].replace('st0.','')
 
+    ssh.send('show policy | match accept | no-more \n')
+    output = prompt(ssh)
+    outputSplit = output.split('\n')
+    policyList = [outputSplit[i][:-1] for i in range(len(outputSplit)) if 'accept_' in outputSplit[i]]
+    log.info("Recorded policy list")
+
+    ssh.send('show route instance | match vpc- | no-more \n')
+    output = prompt(ssh)
+    outputList = output.split('\n')
+    tempList = [outputList[i] for i in range(len(outputList)) if ('vpc-' in outputList[i] and 'inet' not in outputList[i])]
+    vrList = [tempList[i].split(' ')[0] for i in range(len(tempList))]
+    log.info("Recorded router instances")
+
     ssh.send('exit\n')
 
+    configDict = {}
+    configDict['policyList'] = policyList
+    configDict['vrList'] = vrList
+
     if lastTunnelNum == '':
-        return 1
+        configDict['nextTunnelId'] = 1
     else:
-        return 1 + int(lastTunnelNum)
+        configDict['nextTunnelId'] = 1 + int(lastTunnelNum)
+
+    log.info("Returning the current config: policyList = %s,  vrList = %s,  nextTunnelId = %s", configDict['policyList'], configDict['vrList'], configDict['nextTunnelId'])
+    return configDict
+
 
 # Logic to figure out existing tunnel IDs
-def getExistingTunnelId(ssh, vpn_connection_id, tvar):
-    log.info('Start getExistingTunnelId')
+def getCurrentConfigToDelete(ssh, vpn_connection_id, tvar):
+    log.info('Start getCurrentConfigToDelete')
     ssh.send('cli\n')
     prompt(ssh)
     #log.debug("%s", prompt(ssh))
@@ -97,7 +120,7 @@ def getExistingTunnelId(ssh, vpn_connection_id, tvar):
     ssh.send(cli_command)
     #vpn-aws-vpn-
     output = prompt(ssh)
-    log.info("Output in delete getExistingTunnelId: %s", output)
+    log.info("Output in delete getCurrentConfigToDelete: %s", output)
     log.debug("%s", output)
     tunnelNum = 0
 
@@ -108,11 +131,34 @@ def getExistingTunnelId(ssh, vpn_connection_id, tvar):
             for word in line.split(' '):
                 if 'st0' in word:
                     tunnelNum = int(word.replace('st0.',''))
-            
+    
+
+    ssh.send('show policy | match accept | no-more \n')
+    output = prompt(ssh)
+    outputSplit = output.split('\n')
+    policyList = [outputSplit[i][:-1] for i in range(len(outputSplit)) if 'accept_' in outputSplit[i]]
+    log.info("Recorded policy list")
+
+    ssh.send('show route instance | match vpc- | no-more \n')
+    output = prompt(ssh)
+    outputList = output.split('\n')
+    tempList = [outputList[i] for i in range(len(outputList)) if ('vpc-' in outputList[i] and 'inet' not in outputList[i])]
+    vrList = [tempList[i].split(' ')[0] for i in range(len(tempList))]
+    log.info("Recorded router instances")
+
+    configDict = {}
+    configDict['policyList'] = policyList
+    configDict['vrList'] = vrList
+
     if tunnelNum < 0:
-        return 0
+        configDict['nextTunnelId'] = 0
     else:
-        return tunnelNum
+        configDict['nextTunnelId'] = tunnelNum
+
+    log.info("Returning the current config: policyList = %s,  vrList = %s,  nextTunnelId = %s", configDict['policyList'], configDict['vrList'], configDict['nextTunnelId'])
+    return configDict
+
+
 
 #Generic logic to push pre-generated config to the router
 def pushConfig(ssh, config):
@@ -206,8 +252,8 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
     #Extract VPN connection information
     vpn_connection=xmldoc.getElementsByTagName('vpn_connection')[0]
     log.info("vpn_connection %s", vpn_connection)
-    vpn_connection_id=vpn_connection.attributes['id'].value
-    log.info("vpn_connection_id %s", vpn_connection_id)
+    vpn_connection_id=(vpn_connection.attributes['id'].value).lstrip('vpn-')
+    log.info("The truncated vpn_connection_id %s", vpn_connection_id)
     customer_gateway_id=vpn_connection.getElementsByTagName("customer_gateway_id")[0].firstChild.data
     log.info("customer_gateway_id %s", customer_gateway_id)
     vpn_gateway_id=vpn_connection.getElementsByTagName("vpn_gateway_id")[0].firstChild.data
@@ -218,13 +264,11 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
     tunnelId=0
     #Determine the VPN tunnels to work with
     if vpn_status == 'create':    
-        tunnelId=getNextTunnelId(ssh)
-    '''
-    else:
-        tunnelId=getExistingTunnelId(ssh,vpn_connection_id)
-        if tunnelId == 0:
-            return
-    '''
+        currentConfig = getCurrentConfig(ssh)
+        tunnelId = currentConfig['nextTunnelId']
+        policyList = currentConfig['policyList']
+        vrList = currentConfig['vrList']
+
 
     log.info("%s %s with tunnel #%s and #%s.",vpn_status, vpn_connection_id, tunnelId, tunnelId+1)
     # Create or delete the VRF for this connection
@@ -235,12 +279,17 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
 
         ipsec_tunnel_var = 0
         for ipsec_tunnel in vpn_connection.getElementsByTagName("ipsec_tunnel"):
+            #log.info("In the for loop and the ipsec_tunnel is:  %s.",ipsec_tunnel)
             ipsec_tunnel_var += 1
-            tunnelId=getExistingTunnelId(ssh,vpn_connection_id,ipsec_tunnel_var)
+            currentConfig = getCurrentConfigToDelete(ssh,vpn_connection_id,ipsec_tunnel_var)
+            policyList = currentConfig['policyList']
+            vrList = currentConfig['vrList']
+            tunnelId = currentConfig['nextTunnelId']
+            #log.info("In the for loop and the tunnel id is:  %s.",tunnelId)
             if tunnelId == 0:
                 ssh.send('exit\n')
                 return
-
+            
             config_text.append('delete security ike proposal ike-prop-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security ike policy ike-pol-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security ike gateway gw-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
@@ -249,9 +298,22 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
             config_text.append('delete security ipsec proposal ipsec-prop-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security ipsec policy ipsec-pol-{}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
             config_text.append('delete security ipsec vpn {}-{}'.format(vpn_connection_id,ipsec_tunnel_var))
+
+
+            # Delete all bgp policies that have been imported to this VR
+            for policy in policyList:
+                if vpn_connection_id not in policy:
+                    config_text.append('delete routing-instances vpc-{} routing-options instance-import {}'.format(vpn_connection_id,policy))
+
+            # Delete this policy from all the VRs that have imported it
+            for vr in vrList:
+                if vpn_connection_id not in vr:
+                    config_text.append('delete routing-instances {} routing-options instance-import accept_vpc-{}-inet.0'.format(vr,vpn_connection_id))
+            
+            # Now delete the VR and the policy
             config_text.append('delete routing-instances vpc-{}'.format(vpn_connection_id))
-            config_text.append('delete routing-instances transit routing-options instance-import policy-{}'.format(vpn_connection_id))
-            config_text.append('delete policy-options policy-statement policy-{}'.format(vpn_connection_id))
+            config_text.append('delete policy-options policy-statement accept_vpc-{}-inet.0'.format(vpn_connection_id))
+
             # Global Policy Configuration
             config_text.append('delete security policies global policy intervpc match from-zone vpc-{}'.format(vpn_connection_id))
             config_text.append('delete security policies global policy intervpc match to-zone vpc-{}'.format(vpn_connection_id))
@@ -259,11 +321,14 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
             config_text.append('delete security policies global policy intervpn match to-zone vpc-{}'.format(vpn_connection_id))
             config_text.append('delete security policies global policy vpc-2-dc match from-zone vpc-{}'.format(vpn_connection_id))
             config_text.append('delete security policies global policy dc-2-vpc match to-zone vpc-{}'.format(vpn_connection_id))
-        ssh.send('exit\n')
-        
+       
+        log.info("Exiting from the cli mode")
+        ssh.send('exit\n') 
       #------Juniper Create-----#
     else:
         config_text = []
+        #config_text.append('cli \n')
+        #Configs should be pushed by a non-root user (transit). Therefore > is the expected after a successful login
         config_text.append('cli \n')
         config_text.append('configure \n')
         log.info("next hop ip address %s", next_hop)
@@ -384,6 +449,11 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
             config_text.append('set security ike gateway gw-{}-{} address {}'.format(vpn_connection_id,ipsec_tunnel_var,vpn_gateway_tunnel_outside_address))
             config_text.append('set security ike gateway gw-{}-{} no-nat-traversal'.format(vpn_connection_id,ipsec_tunnel_var))
 
+
+            # Add route to the vpn_gateway_tunnel_outside_address
+            #config_text.append('set routing-instances ge-routing routing-options static route {}/32 next-hop {}'.format(vpn_gateway_tunnel_outside_address,next_hop))
+
+
 # This option enables IPSec Dead Peer Detection, which causes periodic
 # messages to be sent to ensure a Security Association remains operational.
 #
@@ -476,22 +546,30 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
             config_text.append('set policy-options policy-statement EXPORT-DEFAULT term default then accept')     
             config_text.append('set policy-options policy-statement EXPORT-DEFAULT term reject then reject')
 #            config_text.append('set protocols bgp group ebgp type external')
-            config_text.append('set routing-instances vpc-{} protocols bgp group ebgp neighbor {} export EXPORT-DEFAULT'.format(vpn_connection_id,vpn_gateway_tunnel_inside_address_ip_address))
             config_text.append('set routing-instances vpc-{} protocols bgp group ebgp neighbor {} peer-as {}'.format(vpn_connection_id,vpn_gateway_tunnel_inside_address_ip_address,vpn_gateway_bgp_asn))
             config_text.append('set routing-instances vpc-{} protocols bgp group ebgp neighbor {} hold-time 30'.format(vpn_connection_id,vpn_gateway_tunnel_inside_address_ip_address))
-            config_text.append('set routing-instances vpc-{} protocols bgp group ebgp neighbor {} local-as {}'.format(vpn_connection_id,vpn_gateway_tunnel_inside_address_ip_address,customer_gateway_bgp_asn))
             config_text.append('set routing-instances vpc-{} protocols bgp group ebgp type external'.format(vpn_connection_id))
 
 ### Juniper Specific Configuration
-            config_text.append('set policy-options policy-statement policy-{} term stx from instance vpc-{}'.format(vpn_connection_id,vpn_connection_id))
-            config_text.append('set policy-options policy-statement policy-{} term stx from protocol static'.format(vpn_connection_id))
-            config_text.append('set policy-options policy-statement policy-{} term stx then accept'.format(vpn_connection_id))
-            config_text.append('set policy-options policy-statement policy-{} term bgp-routes from instance vpc-{}'.format(vpn_connection_id,vpn_connection_id))
-            config_text.append('set policy-options policy-statement policy-{} term bgp-routes from protocol bgp'.format(vpn_connection_id))
-            config_text.append('set policy-options policy-statement policy-{} term bgp-routes then accept'.format(vpn_connection_id))
-            config_text.append('set policy-options policy-statement policy-{} term default-drop from instance vpc-{}'.format(vpn_connection_id,vpn_connection_id))
-            config_text.append('set policy-options policy-statement policy-{} term default-drop then reject'.format(vpn_connection_id))
+            
+            config_text.append('set policy-options policy-statement accept_vpc-{}-inet.0 term 1 from instance vpc-{}'.format(vpn_connection_id,vpn_connection_id))
+            config_text.append('set policy-options policy-statement accept_vpc-{}-inet.0 term 1 from protocol bgp'.format(vpn_connection_id))
+            config_text.append('set policy-options policy-statement accept_vpc-{}-inet.0 term 1 then accept'.format(vpn_connection_id))
 
+            config_text.append('set routing-instances vpc-{} protocols bgp group ebgp as-override'.format(vpn_connection_id))
+
+
+            # Import all bgp policies (except self) to this VR
+            for policy in policyList:
+                if vpn_connection_id not in policy:
+                    config_text.append('set routing-instances vpc-{} routing-options instance-import {}'.format(vpn_connection_id,policy))
+
+            # Import the new policy to all VRs except self
+            for vr in vrList:
+                if vpn_connection_id not in vr:
+                    config_text.append('set routing-instances {} routing-options instance-import accept_vpc-{}-inet.0'.format(vr,vpn_connection_id))
+
+            
             config_text.append('set security zones security-zone vpc-{} host-inbound-traffic system-services ike'.format(vpn_connection_id))
             config_text.append('set security zones security-zone vpc-{} host-inbound-traffic protocol bgp'.format(vpn_connection_id))
             config_text.append('set security zones security-zone vpc-{} interfaces st0.{}'.format(vpn_connection_id,tunnelId))
@@ -499,11 +577,9 @@ def create_jnpr_config(bucket_name, bucket_key, s3_url, bgp_asn, subnet, ssh):
 
             config_text.append('set routing-instances vpc-{} instance-type virtual-router'.format(vpn_connection_id))
             config_text.append('set routing-instances vpc-{} interface st0.{}'.format(vpn_connection_id,tunnelId))
-            config_text.append('set routing-instances vpc-{} routing-options static route 0.0.0.0/0 next-table transit.inet.0'.format(vpn_connection_id))
             config_text.append('set routing-instances vpc-{} routing-options autonomous-system {}'.format(vpn_connection_id,customer_gateway_bgp_asn))
-            config_text.append('set routing-instances vpc-{} protocols bgp multihop'.format(vpn_connection_id))
+            #config_text.append('set routing-instances vpc-{} protocols bgp multihop'.format(vpn_connection_id))
 
-            config_text.append('set routing-instances transit routing-options instance-import policy-{}'.format(vpn_connection_id))
 			
 			 #Adding Global Policies
             config_text.append('set security policies global policy intervpc match from-zone vpc-{}'.format(vpn_connection_id))
@@ -550,13 +626,14 @@ def lambda_handler(event, context):
     os.remove("/tmp/"+config['PRIVATE_KEY'])
     log.debug("Deleted downloaded private key.")
 
+    log.info("Testing Lambda in place update !!!!!")
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     log.info("Connecting to %s (%s)", vsrx_name, vsrx_ip)
     stime = time.time()
     try:
-        c.connect( hostname = vsrx_ip, username = config['USER_NAME'], pkey = k )
+        c.connect( hostname = vsrx_ip, username = config['USER_NAME'], pkey = k, banner_timeout = 30 )
         PubKeyAuth=True
     except paramiko.ssh_exception.AuthenticationException:
         log.error("PubKey Authentication Failed! Connecting with password")
