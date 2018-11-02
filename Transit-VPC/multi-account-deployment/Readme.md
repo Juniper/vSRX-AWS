@@ -2,9 +2,12 @@ Follow the below steps to add a spoke VPC from another account to the account th
 
 1)   Download the template in this page to your local machine.
 2)    Do the following changes in your primary account:
+
 a)     Navigate to your S3 bucket (in which your vpcconfigs folder resides). Click on the permission tab, grant permission to the other AWS account via the canonical user ID (this step may not be   needed if you complete all the following steps but it’s still recommended)
+
 b)      Under Permissions choose bucket policy.
-c)    Add a new line (shown in bold font in the following code block) for each additional AWS account:
+
+c)    Add a new line for each additional AWS account:
  
 {
 "Version": "2008-10-17",
