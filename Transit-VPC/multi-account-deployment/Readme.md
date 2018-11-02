@@ -34,6 +34,7 @@ d)  Go to the AWS Identity and Access Management (IAM) console, and in the left 
 
 
 e)   Choose the encryption key for this solution (You will see “Transit VPC” in the key description), and in the Key Policy section, choose Switch to policy view
+
 f)    In the list of roles allowed to use the master key, add a new line (shown in bold font in the following code block) for each additional account ID:
  
 {      
