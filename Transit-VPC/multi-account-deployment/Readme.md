@@ -43,7 +43,7 @@ f)    In the list of roles allowed to use the master key, add a new line (shown 
     "Principal": {
         "AWS": [
           "arn:aws:iam:: <transit-vpc-primary-account-id>:role/TransitVPC-TransitVpcPollerRole-[cloudformation-id]",
-          "arn:aws:iam:: <transit-vpc-primary-account-id>:role/TransitVPC-CiscoConfigFunctionRole-[cloudformation-id]",
+          "arn:aws:iam:: <transit-vpc-primary-account-id>:role/TransitVPC-JuniperConfigFunctionRole-[cloudformation-id]",
           "arn:aws:iam:: <transit-vpc-primary-account-id>:role/TransitVPC-LambdaLoaderRole-[cloudformation-id]",
           "arn:aws:iam::<account-1-id>:root"
         ]
