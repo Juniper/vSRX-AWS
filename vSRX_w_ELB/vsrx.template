@@ -1,0 +1,422 @@
+{  
+    "AWSTemplateFormatVersion":"2010-09-09",
+    "Description":"vSRX with auto installation group deployment",
+    "Parameters":{  
+        "ImageID":{  
+            "Type":"String",
+            "Description":"The AMI ID for the vSRX image"
+        },
+        "VPCID":{  
+            "Description":"VPC ID",
+            "Type":"AWS::EC2::VPC::Id"
+        },
+        "EC2KeyPair":{  
+            "Description":"Amazon EC2 Key Pair",
+            "Type":"AWS::EC2::KeyPair::KeyName"
+        },
+        "InstanceType":{  
+            "Type":"String",
+            "Default":"c4.xlarge",
+            "AllowedValues":[  
+                "c4.xlarge",
+                "c4.2xlarge",
+                "c4.4xlarge",
+                "c5.large"
+            ],
+            "Description":"Select the instance type you want to use"
+        },
+        "UserData":{  
+            "Description":"User Data configuration. Maximum 4096 bytes.For better readability, encode it with base64. Final userdata will be the combination of UserData and UserData2",
+            "Type":"String",
+            "MaxLength":4096,
+            "ConstraintDescription":"Maximum Number of character for UserData reached!"
+        },
+        "UserData2":{  
+            "Description":"User Data configuration (Optional). Maximum 4096 bytes.",
+            "MaxLength":4096,
+            "Type":"String",
+            "ConstraintDescription":"Maximum Number of character UserData2 reached!"
+        },
+        "MgtSubnetID":{  
+            "Type":"AWS::EC2::Subnet::Id",
+            "Description":"Subnet ID used for the mgmt interface"
+        },
+        "ExternalSubnetID":{  
+            "Type":"AWS::EC2::Subnet::Id",
+            "Description":"Subnet ID used for the revenue interface"
+        },
+        "InternalSubnetID":{  
+            "Type":"AWS::EC2::Subnet::Id",
+            "Description":"Subnet ID used for the internal interface"
+        },
+        "DesiredASGInstances":{  
+            "Type":"Number",
+            "Default":"0",
+            "Description":"Desired number of vSRX in the auto scaling group"
+        },
+        "MaxASGInstances":{  
+            "Type":"Number",
+            "Default":"3",
+            "Description":"Maximum number of vSRX in the auto scaling group"
+        },
+        "LambdaS3Key":{  
+            "Type":"String",
+            "Default":"template/add_eni.zip"
+        },
+        "LambdaS3Bucket":{  
+            "Type":"String",
+            "Default":"vsrx-asg-lambda-function"
+        }
+    },
+    "Resources":{  
+        "TrafficSG":{  
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{  
+                "VpcId":{  
+                    "Ref":"VPCID"
+                },
+                "GroupDescription":"Allows inbound http traffic",
+                "SecurityGroupIngress":[  
+                    {  
+                        "CidrIp":"0.0.0.0/0",
+                        "IpProtocol":"-1"
+                    }
+                ],
+                "SecurityGroupEgress":[  
+                    {  
+                        "CidrIp":"0.0.0.0/0",
+                        "IpProtocol":"-1"
+                    }
+                ]
+            }
+        },
+
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                  "AssumeRolePolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [{
+                              "Effect": "Allow",
+                              "Principal": {
+                                    "Service": "lambda.amazonaws.com"
+                              },
+                              "Action": "sts:AssumeRole"
+                        }]
+                  },
+                  "Path": "/"
+            }
+        },
+        "LambdaExecutionRolePolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "Roles": [{
+                    "Ref": "LambdaExecutionRole"
+                }],
+                "PolicyName": "Lambda_Execution_Permissions",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Effect": "Allow",
+                            "Resource": "arn:aws:logs:*:*:*"
+                        },
+                        {
+                            "Action": [
+                                "ec2:CreateNetworkInterface",
+                                "ec2:DescribeNetworkInterfaces",
+                                "ec2:DetachNetworkInterface",
+                                "ec2:DeleteNetworkInterface",
+                                "ec2:AttachNetworkInterface",
+                                "ec2:DescribeInstances",
+                                "ec2:ModifyNetworkInterfaceAttribute",
+                                "autoscaling:SetDesiredCapacity",
+                                "autoscaling:CompleteLifecycleAction"
+ 
+                            ],
+                            "Effect": "Allow",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        },
+        "ExternalELB":{  
+            "Type":"AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties":{  
+                "Listeners":[  
+                    {  
+                        "InstancePort":"80",
+                        "LoadBalancerPort":"80",
+                        "Protocol":"HTTP"
+                    },
+                    {  
+                        "InstancePort":"22",
+                        "LoadBalancerPort":"22",
+                        "Protocol":"TCP"
+                    }
+                ],
+                "Scheme":"internet-facing",
+                "SecurityGroups":[  
+                    {  
+                        "Ref":"TrafficSG"
+                    }
+                ],
+                "Subnets":[  
+                    {  
+                        "Ref":"MgtSubnetID"
+                    }
+                ],
+                "HealthCheck":{  
+                    "HealthyThreshold":"5",
+                    "Interval":"60",
+                    "Target":"TCP:22",
+                    "Timeout":"5",
+                    "UnhealthyThreshold":"5"
+                }
+            }
+        },
+        "vSRXLaunchConfiguration":{  
+            "Type":"AWS::AutoScaling::LaunchConfiguration",
+            "Properties":{  
+                "AssociatePublicIpAddress":false,
+                "ImageId":{  
+                    "Ref":"ImageID"
+                },
+                "EbsOptimized" : true,
+                "InstanceType":{  
+                    "Ref":"InstanceType"
+                },
+                "SecurityGroups":[  
+                    {  
+                        "Ref":"TrafficSG"
+                    }
+                ],
+                "KeyName":{  
+                    "Ref":"EC2KeyPair"
+                },
+                "BlockDeviceMappings":[
+                    {
+                        "DeviceName" : "/dev/sda1",
+                        "Ebs" : {
+                            "VolumeType" : "gp2",
+                            "VolumeSize" : 20
+                        }
+                    }
+                ],
+                "UserData":{  
+                    "Fn::Join":[  
+                        "",
+                        [  
+                            {  
+                                "Ref":"UserData"
+                            },
+                            {  
+                                "Ref":"UserData2"
+                            }
+                        ]
+                    ]
+                }
+            }
+        },
+        "vSRXASG":{  
+            "Type":"AWS::AutoScaling::AutoScalingGroup",
+            "Properties":{  
+                "DesiredCapacity":0,
+                "Cooldown":100,
+                "LaunchConfigurationName":{  
+                    "Ref":"vSRXLaunchConfiguration"
+                },
+                "LoadBalancerNames":[  
+                    {  
+                        "Ref":"ExternalELB"
+                    }
+                ],
+                "MaxSize":{  
+                    "Ref":"MaxASGInstances"
+                },
+                "MinSize":0,
+                "VPCZoneIdentifier":[  
+                    {  
+                        "Ref":"MgtSubnetID"
+                    }
+                ],
+                "LifecycleHookSpecificationList":[  
+                    {  
+                        "HeartbeatTimeout":300,
+                        "LifecycleHookName":"InstanceLaunchHook",
+                        "LifecycleTransition":"autoscaling:EC2_INSTANCE_LAUNCHING"
+                    }
+                ],
+                "HealthCheckGracePeriod":900,
+                "Tags":[  
+                    {  
+                        "Key":"trust",
+                        "Value":{  
+                            "Ref":"InternalSubnetID"
+                        },
+                        "PropagateAtLaunch":"true"
+                    },
+                    {  
+                        "Key":"untrust",
+                        "Value":{  
+                            "Ref":"ExternalSubnetID"
+                        },
+                        "PropagateAtLaunch":"true"
+                    },
+                    {  
+                        "Key":"mgt",
+                        "Value":{  
+                            "Ref":"MgtSubnetID"
+                        },
+                        "PropagateAtLaunch":"true"
+                    }
+                ]
+            }
+        },
+        "AddENILambda":{  
+            "Type":"AWS::Lambda::Function",
+            "Properties":{  
+                "Code":{  
+                    "S3Bucket":{  
+                        "Ref":"LambdaS3Bucket"
+                    },
+                    "S3Key":{  
+                        "Ref":"LambdaS3Key"
+                    }
+                },
+                "Description":"lambda function to dynamically attach interface to vSRX",
+                "Handler":"add_eni.lambda_handler",
+                "Role":{  
+                        "Fn::GetAtt":[  
+                            "LambdaExecutionRole",
+                            "Arn"
+                        ]
+                    },
+                "Runtime":"python3.6",
+                "Timeout":10
+            }
+        },
+        "CloudWatchRule":{  
+            "Type":"AWS::Events::Rule",
+            "Properties":{  
+                "Description":"Cloudwatch event rule to trigget lambda function",
+                "EventPattern":{  
+                    "source":[  
+                        "aws.autoscaling"
+                    ],
+                    "detail-type":[  
+                        "EC2 Instance-launch Lifecycle Action",
+                        "EC2 Instance Terminate Successful"
+                    ],
+                    "detail":{  
+                        "AutoScalingGroupName":[  
+                            {  
+                                "Ref":"vSRXASG"
+                            }
+                        ]
+                    }
+                },
+                "State":"ENABLED",
+                "Targets":[  
+                    {  
+                        "Arn":{  
+                            "Fn::GetAtt":[  
+                                "AddENILambda",
+                                "Arn"
+                            ]
+                        },
+                        "Id":"vsrx-cloudwatch-rule-target"
+                    }
+                ]
+            }
+        },
+        "PermissionForEventsToInvokeLambda":{  
+            "Type":"AWS::Lambda::Permission",
+            "Properties":{  
+                "FunctionName":{  
+                    "Ref":"AddENILambda"
+                },
+                "Action":"lambda:InvokeFunction",
+                "Principal":"events.amazonaws.com",
+                "SourceArn":{  
+                    "Fn::GetAtt":[  
+                        "CloudWatchRule",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "TriggerEvent":{  
+            "Type":"Custom::TriggerEventType",
+            "Properties":{  
+                "ServiceToken":{  
+                    "Fn::GetAtt":[  
+                        "AddENILambda",
+                        "Arn"
+                    ]
+                },
+                "DesiredInstances":{  
+                    "Ref":"DesiredASGInstances"
+                },
+                "AutoScalingGroupName":{  
+                    "Ref":"vSRXASG"
+                }
+            },
+            "DependsOn":[  
+                "AddENILambda",
+                "vSRXASG",
+                "CloudWatchRule",
+                "PermissionForEventsToInvokeLambda"
+            ]
+        }
+    },
+    "Metadata":{  
+        "AWS::CloudFormation::Interface":{  
+            "ParameterGroups":[  
+                {  
+                    "Label":{  
+                        "default":"vSRX configuration"
+                    },
+                    "Parameters":[  
+                        "VPCID",
+                        "VPCNetwork",
+                        "InstanceType",
+                        "MgtSubnetID",
+                        "ExternalSubnetID",
+                        "InternalSubnetID",
+                        "ImageID",
+                        "KeyName",
+                        "UserData",
+                        "UserData2"
+                    ]
+                },
+                {  
+                    "Label":{  
+                        "default":"Auto scaling group configuration"
+                    },
+                    "Parameters":[  
+                        "DesiredASGInstances",
+                        "MaxASGInstances"
+                    ]
+                },
+                {  
+                    "Label":{  
+                        "default":"Lambda S3 Location"
+                    },
+                    "Parameters":[  
+                        "LambdaS3Bucket",
+                        "LambdaS3Key"
+                    ]
+                }
+            ]
+        }
+    },
+    "Outputs":{  
+
+    }
+}
