@@ -86,7 +86,7 @@
   "Conditions" : {
     "AuthorizeAnotherAccount" : {"Fn::Not" : [
     {"Fn::Equals" : [
-        {"Ref": "AccountId"}, 
+        {"Ref": "AccountId"},
         ""
     ]}
     ]},
@@ -129,7 +129,7 @@
   },
   "Mappings" : {
     "Function" : {
-      "Configurator" : { 
+      "Configurator" : {
     "CodeLocation" : "juniper-transit-vpc-solution/transit-vpc-push-juniper-config.zip",
     "CodeRegion" : "us-east-1",
     "Name" : "juniper-configurator",
@@ -138,7 +138,7 @@
         "Timeout": "300",
         "MemorySize": "128"
       },
-      "Poller" : { 
+      "Poller" : {
     "CodeLocation" : "juniper-transit-vpc-solution/transit-vpc-poller.py",
     "CodeRegion" : "us-east-1",
     "Name" : "vgw-poller",
@@ -160,21 +160,22 @@
       }
     },
     "JunipervSRXAMI" : {
-      "us-east-1"      : { "byol" : "ami-4ca1fc37" },
-      "us-east-2"      : { "byol" : "ami-00230365" },
-      "us-west-2"      : { "byol" : "ami-3542584c" },
-      "us-west-1"      : { "byol" : "ami-9186aff1" },
-      "ca-central-1"   : { "byol" : "ami-ab04bbcf" },
-      "eu-west-1"      : { "byol" : "ami-2117ff58" },
-      "eu-west-2"      : { "byol" : "ami-d76f7eb3" },
-      "eu-central-1"   : { "byol" : "ami-5bdf7334" },
-      "ap-south-1"     : { "byol" : "ami-26f68e49" },
-      "ap-southeast-1" : { "byol" : "ami-c5a331a6" },
-      "ap-southeast-2" : { "byol" : "ami-14c1de77" },
-      "ap-northeast-1" : { "byol" : "ami-02729164" },
-      "ap-northeast-2" : { "byol" : "ami-2bbe6745" },
-      "sa-east-1"      : { "byol" : "ami-0656216a" } 
-
+      "us-east-1"      : { "byol" : "ami-0c97721215a4e542b" },
+      "us-east-2"      : { "byol" : "ami-0bbf51ba3355f03d6" },
+      "us-west-2"      : { "byol" : "ami-0cf5905679d7747fd" },
+      "us-west-1"      : { "byol" : "ami-00b5ea24c63af7bff" },
+      "ca-central-1"   : { "byol" : "ami-04a31bc7518969f2e" },
+      "eu-west-1"      : { "byol" : "ami-08b722fdc209b83ae" },
+      "eu-west-2"      : { "byol" : "ami-0053111d7a7e064f2" },
+      "eu-west-3"      : { "byol" : "ami-00f058cda73f8ce91"},
+      "eu-central-1"   : { "byol" : "ami-032b9aeb5bdd0f83c" },
+      "eu-north-1"     : { "byol" : "ami-79f87107"},
+      "ap-south-1"     : { "byol" : "ami-0e16590c71055783f" },
+      "ap-southeast-1" : { "byol" : "ami-03728806128406f99" },
+      "ap-southeast-2" : { "byol" : "ami-05ffae56d32597ce1" },
+      "ap-northeast-1" : { "byol" : "ami-0ca960c2e1985d73b" },
+      "ap-northeast-2" : { "byol" : "ami-04d9bed8fd1cc0d66" },
+      "sa-east-1"      : { "byol" : "ami-0e906885b1d0b4d60" }
     },
     "PrefixListIdMap" : {
       "ap-south-1" : { "s3" : "pl-78a54011" },
@@ -243,7 +244,7 @@
         ] },
             "Action": [
               "kms:*"
-            ], 
+            ],
             "Resource": "*"
           },
       {
@@ -261,7 +262,7 @@
               "kms:ReEncrypt*",
               "kms:GenerateDataKey*",
               "kms:DescribeKey"
-            ], 
+            ],
             "Resource": "*"
           } ]
         }
@@ -1178,8 +1179,8 @@
        "Region": { "Ref": "AWS::Region" },
        "CreateSshKey" : { "Fn::Join": ["", [
         "{ 'Bucket' : '",{ "Ref" : "VPNConfigS3Bucket" },"', ",
-        "'SSEKMSKeyId' : 'arn:aws:kms:",{"Ref" : "AWS::Region"},":",{ "Ref" : "AWS::AccountId" }, ":key/", { "Ref" : "KMSKey" }, "', ", 
-        "'PrivateKey' : '", { "Ref" : "S3Prefix" }, { "Fn::FindInMap" : [ "Function", "vSRX", "PrivateKey"]}, "', ", 
+        "'SSEKMSKeyId' : 'arn:aws:kms:",{"Ref" : "AWS::Region"},":",{ "Ref" : "AWS::AccountId" }, ":key/", { "Ref" : "KMSKey" }, "', ",
+        "'PrivateKey' : '", { "Ref" : "S3Prefix" }, { "Fn::FindInMap" : [ "Function", "vSRX", "PrivateKey"]}, "', ",
         "'PublicKey' : '", { "Ref" : "S3Prefix" }, { "Fn::FindInMap" : [ "Function", "vSRX", "PublicKey"]}, "' ",
         "}"
     ]] }
@@ -1301,8 +1302,8 @@
     ]] },
        "StoreInS3KMS" : { "Fn::Join": ["", [
         "[{ 'Bucket' : '",{ "Ref" : "VPNConfigS3Bucket" },"', ",
-        "'Key' : '", { "Ref" : "S3Prefix" }, "transit_vpc_config.txt', ", 
-        "'SSEKMSKeyId' : 'arn:aws:kms:",{"Ref" : "AWS::Region"},":",{ "Ref" : "AWS::AccountId" }, ":key/", { "Ref" : "KMSKey" }, "', ", 
+        "'Key' : '", { "Ref" : "S3Prefix" }, "transit_vpc_config.txt', ",
+        "'SSEKMSKeyId' : 'arn:aws:kms:",{"Ref" : "AWS::Region"},":",{ "Ref" : "AWS::AccountId" }, ":key/", { "Ref" : "KMSKey" }, "', ",
         "'Body': \"{",
             "'UUID':'",{"Fn::GetAtt": [ "CreateUniqueID", "UUID" ] },"',",
             "'EIP1':'",{ "Ref" : "vSRXEip12" },"',",
@@ -1393,7 +1394,7 @@
         }
          ]
         }
-      } 
+      }
     },
    "PollerFunct": {
      "DependsOn" : "JuniperConfigFunct",
@@ -1431,7 +1432,7 @@
         "GroupDescription" : "VSRX Security Group Rules",
         "VpcId" : { "Ref" : "TransitVPC" },
         "SecurityGroupIngress" : [
-           { "IpProtocol" : "tcp", "FromPort" : "22",  "ToPort" : "22",  "CidrIp" : { "Ref" : "AllowedSshIpAddress" } }, 
+           { "IpProtocol" : "tcp", "FromPort" : "22",  "ToPort" : "22",  "CidrIp" : { "Ref" : "AllowedSshIpAddress" } },
            { "IpProtocol" : "icmp", "FromPort" : "8", "ToPort" : "-1", "CidrIp" : { "Ref" : "AllowedSshIpAddress" } }
            ],
         "SecurityGroupEgress" : [
@@ -1542,35 +1543,35 @@
   "Outputs" : {
     "VSRX1" : {
       "Description" : "IP Address for VSRX1",
-      "Value" : { "Fn::GetAtt" : [ "VpcvSRX1", "PublicIp" ] } 
+      "Value" : { "Fn::GetAtt" : [ "VpcvSRX1", "PublicIp" ] }
     },
     "VSRX2" : {
       "Description" : "IP Address for VSRX2",
-      "Value" : { "Fn::GetAtt" : [ "VpcvSRX2", "PublicIp" ] } 
+      "Value" : { "Fn::GetAtt" : [ "VpcvSRX2", "PublicIp" ] }
     },
     "ConfigS3Bucket" : {
       "Description" : "S3 bucket for storing VPN configuration information.",
-      "Value" : { "Ref" : "VPNConfigS3Bucket" } 
+      "Value" : { "Ref" : "VPNConfigS3Bucket" }
     },
     "BucketPrefix" : {
       "Description" : "S3 prefix for storing VPN configuration information.",
-      "Value" : { "Ref" : "S3Prefix" } 
+      "Value" : { "Ref" : "S3Prefix" }
     },
     "SpokeVPCTag" : {
       "Description" : "Tag used to identify spoke VPCs.",
-      "Value" : { "Ref": "SpokeTag" } 
+      "Value" : { "Ref": "SpokeTag" }
     },
     "SpokeVPCTagValue" : {
       "Description" : "Tag valued used to idenfity spoke VPCs.",
-      "Value" : { "Ref": "SpokeTagValue" } 
+      "Value" : { "Ref": "SpokeTagValue" }
     },
     "PreferredPathTagName" : {
       "Description" : "Tag used to identify the spoke VPC preferred path.",
-      "Value" : { "Ref": "PreferredPathTag" } 
+      "Value" : { "Ref": "PreferredPathTag" }
     },
     "UUID": {
       "Description": "Newly created random UUID.",
-      "Value": { "Fn::GetAtt": [ "CreateUniqueID", "UUID" ] } 
+      "Value": { "Fn::GetAtt": [ "CreateUniqueID", "UUID" ] }
     }
   }
 }
