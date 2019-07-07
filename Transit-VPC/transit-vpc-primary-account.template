@@ -181,6 +181,7 @@
       "ap-south-1" : { "s3" : "pl-78a54011" },
       "eu-west-1" : { "s3" : "pl-6da54004" },
       "eu-west-2" : { "s3" : "pl-7ca54015" },
+      "eu-west-3" : { "s3" : " pl-23ad484a " },
       "ap-southeast-1" : { "s3" : "pl-6fa54006" },
       "ap-southeast-2" : { "s3" : "pl-6ca54005" },
       "eu-central-1" : { "s3" : "pl-6ea54007" },
@@ -191,7 +192,8 @@
       "sa-east-1" : { "s3" : "pl-6aa54003" },
       "us-west-1" : { "s3" : "pl-6ba54002" },
       "us-west-2" : { "s3" : "pl-68a54001" },
-      "ca-central-1" : { "s3" : "pl-7da54014" }
+      "ca-central-1" : { "s3" : "pl-7da54014" },
+      "sa-east-1" : { "s3" : "pl-6aa54003" }
     },
     "vSRXInstance" : {
       "C4.Xlarge"   : { "Type" : "c4.xlarge",   "Bandwidth" : "500000" }
