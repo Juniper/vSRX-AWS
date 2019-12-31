@@ -8,7 +8,7 @@ PREREQUISITE
 --------------
 
 1. Install python pacakges: click boto3 pyyaml tabulate
-  # sudo pip install click boto3 pyyaml tabulate
+   #sudo pip install click boto3 pyyaml tabulate
 
 2. Install docker engine 
   https://docs.docker.com/install/
