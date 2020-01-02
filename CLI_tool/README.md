@@ -1,7 +1,9 @@
 About the CLI tool:
 -------------------
 
-The tool vsrx-aws aims to be a simple CLI option to deploy the vSRX and other supported solutions such as ELB on AWS. The tool is in its Beta stage and there is no planned effort to address any issues that may be reported. 
+The tool vsrx-aws aims to be a simple CLI option to deploy the vSRX and other supported solutions such as ELB on AWS. 
+
+The tool is in its Beta stage and there is no planned effort to address any issues that may be reported. 
 
 
 PREREQUISITE
@@ -28,12 +30,11 @@ Unzip all the contents of the file. If all the packages listed above have been i
 #./vsrx-aws
 Usage: vsrx-aws [OPTIONS] COMMAND [ARGS]...
 
-  vsrx-aws is an orchestration tool for automated provisioning, scaling and
-  management of vSRX in AWS
-
+  vsrx-aws is an orchestration tool for automated provisioning, scaling and management of vSRX in AWS
+  
 Options:
   --help  Show this message and exit.
-
+  
 Commands:
   deploy        Launch a vSRX instance
   images        List vSRX images in AWS marketplace
@@ -43,12 +44,11 @@ Commands:
   vpc-create    Create a new VPC
   vpc-show      Show VPC parameters
   wait          Wait vSRX fpc online
-
+  
 EXAMPLE
 -------
 
-An example command to create a VPC, subnets, route-tables and deploy a vSRX instance with DestNAT is in the file "launch_vsrx_dnat_web_ecs.sh".
+An example command to create a VPC, subnets, route-tables and deploy a vSRX instance is in the file "log.txt".
 
-Edit the file to update the Key filenames before you execute the shell script.
+One such complete execution of the tool is in the log.txt file. 
 
-One such complete execution of the tool is in the success_log.txt file.
