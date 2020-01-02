@@ -1,0 +1,358 @@
+username-mbp:aws_vsrx username$ sh launch_vsrx_dnat_web_ecs.sh 
+++ whoami
++ prefix=username
++ VPC_NAME=username-vpc-test1
++ KEY_NAME=user-kp-virginia
++ KEY_FILE=user-kp-virginia.pem
++ VPC_CIDR=172.31.0.0/16
++ SUBNET_MGT=username-manage-01
++ SUBNET_MGT_CIDR=172.31.10.0/24
++ SUBNET_WEB=username-webtier-01
++ SUBNET_WEB_CIDR=172.31.20.0/24
++ ROUTE_TABLE_WEB=username-webtier-rtb
++ SUBNET_PUBLIC=username-public-01
++ SUBNET_PUBLIC_CIDR=172.31.30.0/24
++ ROUTE_TABLE_PUBLIC=username-public-rtb
++ AVAILABILITY_ZONE=us-east-1a
++ INSTANCE_NAME=username-vsrx-test
++ IMAGE_ID=ami-0f0442c45665d343a
++ PROFILE_OPTION='--profile saml'
++ USE_EXISTING_VPC=--skip-if-exist
++ Topology='
+                                    ge-0/0/0           ge-0/0/1
+                                        +-----------------+     
+ nginx(ECS) +-----+ SUBNET_WEB +--------|       vSRX      |-------+ SUBNET_PUBLIC +--+-- INTERNET
+                                        +--------+--------+                          |
+                                                 | fxp0                              |
+                                                 |                                   |
+                                                 +                                   |
+                                            SUBNET_MGT +-----------------------------+
+'
++ vpc_id_file=/tmp/88317.vpc.id
++ ./vsrx-aws vpc-create --name username-vpc-test1 --subnet 172.31.10.0/24,name=username-manage-01,availability_zone=us-east-1a --subnet 172.31.20.0/24,name=username-webtier-01,availability_zone=us-east-1a,route_table=username-webtier-rtb --subnet 172.31.30.0/24,name=username-public-01,availability_zone=us-east-1a,route_table=username-public-rtb --save-vpc-id /tmp/88317.vpc.id --profile saml --skip-if-exist 172.31.0.0/16
+2019-12-31 12:48:26,786 [INFO] vsrx-aws: Checking if there is VPC with the same name
+2019-12-31 12:48:31,749 [INFO] vsrx-aws: Created VPC, id=vpc-03b9f1639fbb9c642
+2019-12-31 12:48:32,985 [INFO] vsrx-aws: Created subnet, id=subnet-0f605e588db6a5902
+2019-12-31 12:48:34,003 [INFO] vsrx-aws: Created subnet, id=subnet-0e2264c4bfc33da92
+2019-12-31 12:48:34,413 [INFO] vsrx-aws: Created route table, id=rtb-0de93df95b90e4f3c
+2019-12-31 12:48:34,763 [INFO] vsrx-aws: Associated route table to subnet subnet-0e2264c4bfc33da92
+2019-12-31 12:48:36,011 [INFO] vsrx-aws: Created subnet, id=subnet-00d95df499944e277
+2019-12-31 12:48:36,364 [INFO] vsrx-aws: Created route table, id=rtb-07a85c10ada115506
+2019-12-31 12:48:36,768 [INFO] vsrx-aws: Associated route table to subnet subnet-00d95df499944e277
+2019-12-31 12:48:37,693 [INFO] vsrx-aws: Saving vpc_id(vpc-03b9f1639fbb9c642) to /tmp/88317.vpc.id
+2019-12-31 12:48:37,694 [INFO] vsrx-aws: Showing VPC information:
++-----------------------+--------------------+---------------+------------------------------------------------------------------------+-------------------------------+-------------------------------------------+
+| VPC_ID                | VPC_NAME           | CIDR          | SUBNETS                                                                | SEC_GROUPS                    | ROUTE_TABLE                               |
++=======================+====================+===============+========================================================================+===============================+===========================================+
+| vpc-03b9f1639fbb9c642 | username-vpc-test.. | 172.31.0.0/16 | subnet-0e2264c4bfc33da92(username-webtier-01),172.31.20.0/24,us-east-1a | sg-06eb49d061b26090b(default) | rtb-07a85c10ada115506(username-public-r..) |
+|                       |                    |               | subnet-00d95df499944e277(username-public-01),172.31.30.0/24,us-east-1a  |                               | rtb-0de93df95b90e4f3c(username-webtier-..) |
+|                       |                    |               | subnet-0f605e588db6a5902(username-manage-01),172.31.10.0/24,us-east-1a  |                               | rtb-02a2c082df212111e()                   |
++-----------------------+--------------------+---------------+------------------------------------------------------------------------+-------------------------------+-------------------------------------------+
++ instance_id_file=/tmp/88317.vsrx.id
++ '[' 0 -eq 0 ']'
+++ cat /tmp/88317.vpc.id
++ vpc_id=vpc-03b9f1639fbb9c642
++ ./vsrx-aws deploy --instance-name username-vsrx-test --key-name user-kp-virginia --key-file user-kp-virginia.pem --vpc-id vpc-03b9f1639fbb9c642 --nic subnet-name=username-manage-01,public-ip=auto --nic subnet-name=username-webtier-01,subnet-gateway=self --nic subnet-name=username-public-01,public-ip=auto --junos-config-file demo/data/init_src_nat.conf --config-interface --wait-fpc-online --save-instance-id /tmp/88317.vsrx.id --profile saml ami-0f0442c45665d343a
+2019-12-31 12:48:41,128 [INFO] vsrx-aws: Starting to deploy vSRX in AWS, image_id=ami-0f0442c45665d343a
+2019-12-31 12:48:41,141 [INFO] vsrx-aws: Checking nics configurations ..
+2019-12-31 12:48:42,607 [INFO] vsrx-aws: Subnet id subnet-0f605e588db6a5902 (username-manage-01)
+2019-12-31 12:48:52,026 [INFO] vsrx-aws: Subnet id subnet-0e2264c4bfc33da92 (username-webtier-01)
+2019-12-31 12:48:56,031 [INFO] vsrx-aws: Subnet id subnet-00d95df499944e277 (username-public-01)
+2019-12-31 12:49:01,882 [INFO] vsrx-aws: One vSRX instance created
+2019-12-31 12:49:01,882 [INFO] vsrx-aws: Waiting instance ready ...
+2019-12-31 12:49:17,758 [INFO] vsrx-aws: Instance is running now
+2019-12-31 12:49:17,761 [INFO] vsrx-aws: Checking if there is internet gateway in VPC(vpc-03b9f1639fbb9c642)
+2019-12-31 12:49:19,500 [INFO] vsrx-aws: Created internet gateway , id = igw-093bc5a477ec26a07
+2019-12-31 12:49:19,855 [INFO] vsrx-aws: Attached internet gateway(igw-093bc5a477ec26a07) to VPC(vpc-03b9f1639fbb9c642)
+2019-12-31 12:49:19,860 [INFO] vsrx-aws: Adding elastic IP to interface eni-02ed969abae1d2340
+2019-12-31 12:49:19,860 [INFO] vsrx-aws: Allocating new elastic IP
+2019-12-31 12:49:22,435 [INFO] vsrx-aws: Associated elastic IP address 54.146.136.192
+2019-12-31 12:49:25,513 [INFO] vsrx-aws: Creating route rtb_id rtb-02a2c082df212111e, CIDR 0.0.0.0/0, gw_id igw-093bc5a477ec26a07
+2019-12-31 12:49:28,072 [INFO] vsrx-aws: Creating route rtb_id rtb-0de93df95b90e4f3c, CIDR 0.0.0.0/0, interface_id eni-0b14d887dc6dbfe93
+2019-12-31 12:49:29,422 [INFO] vsrx-aws: Adding elastic IP to interface eni-04e51761a8704cc98
+2019-12-31 12:49:29,422 [INFO] vsrx-aws: Allocating new elastic IP
+2019-12-31 12:49:30,951 [INFO] vsrx-aws: Associated elastic IP address 3.233.231.155
+2019-12-31 12:49:32,130 [INFO] vsrx-aws: Creating route rtb_id rtb-07a85c10ada115506, CIDR 0.0.0.0/0, gw_id igw-093bc5a477ec26a07
+2019-12-31 12:49:45,559 [INFO] vsrx-aws: Interface ge-0/0/0(device_idx 1): src/dst check disabled
+2019-12-31 12:49:46,586 [INFO] vsrx-aws: Interface ge-0/0/1(device_idx 2): src/dst check disabled
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     Instance ID.............................[i-067098361fb68db5d]
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     Image ID................................[ami-0f0442c45665d343a]
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     Instance type...........................[c5.large]
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     Architecture............................[x86_64]
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     Public IP...............................[54.146.136.192]
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     Key Name................................[user-kp-virginia]
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     VPC ID..................................[vpc-03b9f1639fbb9c642]
+2019-12-31 12:49:47,327 [INFO] vsrx-aws:     State...................................[running]
+2019-12-31 12:49:47,335 [INFO] vsrx-aws:     fxp0 - Status...........................[in-use]
+2019-12-31 12:49:47,335 [INFO] vsrx-aws:     fxp0 - Mac address......................[12:17:91:0e:8d:cf]
+2019-12-31 12:49:47,335 [INFO] vsrx-aws:     fxp0 - Public IPv4......................[54.146.136.192]
+2019-12-31 12:49:47,335 [INFO] vsrx-aws:     fxp0 - Private IPv4.....................[172.31.10.125]
+2019-12-31 12:49:47,335 [INFO] vsrx-aws:     fxp0 - Subnet ID........................[subnet-0f605e588db6a5902]
+2019-12-31 12:49:47,335 [INFO] vsrx-aws:     fxp0 - Groups...........................[sg-06eb49d061b26090b,sg-03a06f8fdc467f1f3]
+2019-12-31 12:49:47,335 [INFO] vsrx-aws:     fxp0 - src/dst check....................[True]
+2019-12-31 12:49:47,337 [INFO] vsrx-aws:     ge-0/0/0 - Status.......................[in-use]
+2019-12-31 12:49:47,337 [INFO] vsrx-aws:     ge-0/0/0 - Mac address..................[12:ea:ae:46:62:3d]
+2019-12-31 12:49:47,337 [INFO] vsrx-aws:     ge-0/0/0 - Private IPv4.................[172.31.20.133]
+2019-12-31 12:49:47,337 [INFO] vsrx-aws:     ge-0/0/0 - Subnet ID....................[subnet-0e2264c4bfc33da92]
+2019-12-31 12:49:47,337 [INFO] vsrx-aws:     ge-0/0/0 - Groups.......................[sg-06eb49d061b26090b,sg-0bf47d1d25a23dffe]
+2019-12-31 12:49:47,338 [INFO] vsrx-aws:     ge-0/0/0 - src/dst check................[False]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws:     ge-0/0/1 - Status.......................[in-use]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws:     ge-0/0/1 - Mac address..................[12:3e:ef:08:a9:d3]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws:     ge-0/0/1 - Public IPv4..................[3.233.231.155]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws:     ge-0/0/1 - Private IPv4.................[172.31.30.62]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws:     ge-0/0/1 - Subnet ID....................[subnet-00d95df499944e277]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws:     ge-0/0/1 - Groups.......................[sg-06eb49d061b26090b,sg-0bf47d1d25a23dffe]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws:     ge-0/0/1 - src/dst check................[False]
+2019-12-31 12:49:47,340 [INFO] vsrx-aws: Waiting vSRX NETCONF service ready ...
+2019-12-31 12:51:02,702 [INFO] vsrx-aws: i-067098361fb68db5d:NETCONF is not ready, waiting 60s ...
+2019-12-31 12:53:18,289 [INFO] vsrx-aws: i-067098361fb68db5d:NETCONF is not ready, waiting 60s ...
+2019-12-31 12:55:33,498 [INFO] vsrx-aws: i-067098361fb68db5d:NETCONF is not ready, waiting 60s ...
+2019-12-31 12:57:48,684 [INFO] vsrx-aws: i-067098361fb68db5d:NETCONF is not ready, waiting 60s ...
+2019-12-31 13:00:03,866 [INFO] vsrx-aws: i-067098361fb68db5d:NETCONF is not ready, waiting 60s ...
+2019-12-31 13:02:36,954 [INFO] vsrx-aws: i-067098361fb68db5d:vSRX is ready to configure
+2019-12-31 13:02:41,960 [INFO] vsrx-aws: Showing system information ...
+2019-12-31 13:02:41,960 [INFO] vsrx-aws: docker run -it --rm -v "$PWD/ansible/playbook/":/playbooks -v "/Users/username/AWS Templates/path-vsrx-tool/aws_vsrx/user-kp-virginia.pem:/host-key.pem" -e ANSIBLE_NET_SSH_KEYFILE=/host-key.pem juniper/pyez-ansible ansible-playbook --user ec2-user -i 54.146.136.192, show_device_info.yml
+
+PLAY [Get device information] **************************************************************************************************************************************************************************************
+
+TASK [Get software and uptime information] *************************************************************************************************************************************************************************
+ok: [54.146.136.192]
+
+TASK [Print response] **********************************************************************************************************************************************************************************************
+ok: [54.146.136.192] => {
+    "junos_result": {
+        "changed": false, 
+        "failed": false, 
+        "results": [
+            {
+                "changed": false, 
+                "command": "show version", 
+                "failed": false, 
+                "format": "text", 
+                "msg": "The command executed successfully.", 
+                "stdout": "\nModel: vSRX\nJunos: 19.1R1.6\nJUNOS OS Kernel 64-bit XEN [20190305.df99236_builder_stable_11]\nJUNOS OS libs [20190305.df99236_builder_stable_11]\nJUNOS OS runtime [20190305.df99236_builder_stable_11]\nJUNOS OS time zone information [20190305.df99236_builder_stable_11]\nJUNOS OS libs compat32 [20190305.df99236_builder_stable_11]\nJUNOS OS 32-bit compatibility [20190305.df99236_builder_stable_11]\nJUNOS py extensions [20190321.051058_builder_junos_191_r1]\nJUNOS py base [20190321.051058_builder_junos_191_r1]\nJUNOS OS vmguest [20190305.df99236_builder_stable_11]\nJUNOS OS support utilities [20190305.df99236_builder_stable_11]\nJUNOS OS crypto [20190305.df99236_builder_stable_11]\nJUNOS network stack and utilities [20190321.051058_builder_junos_191_r1]\nJUNOS libs [20190321.051058_builder_junos_191_r1]\nJUNOS libs compat32 [20190321.051058_builder_junos_191_r1]\nJUNOS runtime [20190321.051058_builder_junos_191_r1]\nJUNOS Web Management Platform Package [20190321.051058_builder_junos_191_r1]\nJUNOS vsrx modules [20190321.051058_builder_junos_191_r1]\nJUNOS srx libs compat32 [20190321.051058_builder_junos_191_r1]\nJUNOS srx runtime [20190321.051058_builder_junos_191_r1]\nJUNOS srx platform support [20190321.051058_builder_junos_191_r1]\nJUNOS common platform support [20190321.051058_builder_junos_191_r1]\nJUNOS vsrx runtime [20190321.051058_builder_junos_191_r1]\nJUNOS pppoe [20190321.051058_builder_junos_191_r1]\nJUNOS mtx network modules [20190321.051058_builder_junos_191_r1]\nJUNOS modules [20190321.051058_builder_junos_191_r1]\nJUNOS srx libs [20190321.051058_builder_junos_191_r1]\nJUNOS srx Data Plane Crypto Support [20190321.051058_builder_junos_191_r1]\nJUNOS daemons [20190321.051058_builder_junos_191_r1]\nJUNOS srx daemons [20190321.051058_builder_junos_191_r1]\nJUNOS SRX TVP AppQos Daemon [20190321.051058_builder_junos_191_r1]\nJUNOS J-Insight [20190321.051058_builder_junos_191_r1]\nJUNOS Online Documentation [20190321.051058_builder_junos_191_r1]\nJUNOS jail runtime [20190305.df99236_builder_stable_11]\nJUNOS FIPS mode utilities [20190321.051058_builder_junos_191_r1]\n", 
+                "stdout_lines": [
+                    "", 
+                    "Model: vSRX", 
+                    "Junos: 19.1R1.6", 
+                    "JUNOS OS Kernel 64-bit XEN [20190305.df99236_builder_stable_11]", 
+                    "JUNOS OS libs [20190305.df99236_builder_stable_11]", 
+                    "JUNOS OS runtime [20190305.df99236_builder_stable_11]", 
+                    "JUNOS OS time zone information [20190305.df99236_builder_stable_11]", 
+                    "JUNOS OS libs compat32 [20190305.df99236_builder_stable_11]", 
+                    "JUNOS OS 32-bit compatibility [20190305.df99236_builder_stable_11]", 
+                    "JUNOS py extensions [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS py base [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS OS vmguest [20190305.df99236_builder_stable_11]", 
+                    "JUNOS OS support utilities [20190305.df99236_builder_stable_11]", 
+                    "JUNOS OS crypto [20190305.df99236_builder_stable_11]", 
+                    "JUNOS network stack and utilities [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS libs [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS libs compat32 [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS runtime [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS Web Management Platform Package [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS vsrx modules [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS srx libs compat32 [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS srx runtime [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS srx platform support [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS common platform support [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS vsrx runtime [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS pppoe [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS mtx network modules [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS modules [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS srx libs [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS srx Data Plane Crypto Support [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS daemons [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS srx daemons [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS SRX TVP AppQos Daemon [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS J-Insight [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS Online Documentation [20190321.051058_builder_junos_191_r1]", 
+                    "JUNOS jail runtime [20190305.df99236_builder_stable_11]", 
+                    "JUNOS FIPS mode utilities [20190321.051058_builder_junos_191_r1]"
+                ]
+            }, 
+            {
+                "changed": false, 
+                "command": "show system uptime", 
+                "failed": false, 
+                "format": "text", 
+                "msg": "The command executed successfully.", 
+                "stdout": "\nCurrent time: 2019-12-31 07:32:49 UTC\nTime Source:  LOCAL CLOCK \nSystem booted: 2019-12-31 07:21:10 UTC (00:11:39 ago)\nProtocols started: 2019-12-31 07:31:04 UTC (00:01:45 ago)\nLast configured: 2019-12-31 07:32:13 UTC (00:00:36 ago) by root\n 7:32AM  up 12 mins, 0 users, load averages: 1.08, 0.50, 0.24\n", 
+                "stdout_lines": [
+                    "", 
+                    "Current time: 2019-12-31 07:32:49 UTC", 
+                    "Time Source:  LOCAL CLOCK ", 
+                    "System booted: 2019-12-31 07:21:10 UTC (00:11:39 ago)", 
+                    "Protocols started: 2019-12-31 07:31:04 UTC (00:01:45 ago)", 
+                    "Last configured: 2019-12-31 07:32:13 UTC (00:00:36 ago) by root", 
+                    " 7:32AM  up 12 mins, 0 users, load averages: 1.08, 0.50, 0.24"
+                ]
+            }
+        ]
+    }
+}
+
+PLAY RECAP *********************************************************************************************************************************************************************************************************
+54.146.136.192             : ok=2    changed=0    unreachable=0    failed=0   
+
+2019-12-31 13:02:51,304 [INFO] vsrx-aws: Configuring ge interfaces ...
+2019-12-31 13:02:54,171 [INFO] vsrx-aws: docker run -it --rm -v "$(pwd)/ansible/playbook/:/playbooks" -v "/Users/username/AWS Templates/path-vsrx-tool/aws_vsrx/user-kp-virginia.pem:/host-key.pem" -v /tmp/i-067098361fb68db5d-interfaces.yml:/interfaces_var.yml -e ANSIBLE_NET_SSH_KEYFILE=/host-key.pem juniper/pyez-ansible ansible-playbook --user ec2-user -i 54.146.136.192, configure_interfaces.yml
+
+PLAY [Configure device interfaces] *********************************************************************************************************************************************************************************
+
+TASK [template interfaces configuration] ***************************************************************************************************************************************************************************
+changed: [54.146.136.192]
+
+TASK [Configure interfaces] ****************************************************************************************************************************************************************************************
+changed: [54.146.136.192]
+
+TASK [Print the complete response.] ********************************************************************************************************************************************************************************
+ok: [54.146.136.192] => {
+    "response": {
+        "changed": true, 
+        "diff": "\n[edit interfaces ge-0/0/0 unit 0]\n+     family inet {\n+         address 172.31.20.133/24;\n+     }\n[edit interfaces ge-0/0/1 unit 0]\n+     family inet {\n+         address 172.31.30.62/24;\n+     }\n[edit]\n+  routing-instances {\n+      fwdd_vr {\n+          instance-type virtual-router;\n+          interface ge-0/0/0.0;\n+          interface ge-0/0/1.0;\n+          routing-options {\n+              static {\n+                  route 0.0.0.0/0 next-hop 172.31.30.1;\n+              }\n+          }\n+      }\n+  }\n", 
+        "diff_lines": [
+            "", 
+            "[edit interfaces ge-0/0/0 unit 0]", 
+            "+     family inet {", 
+            "+         address 172.31.20.133/24;", 
+            "+     }", 
+            "[edit interfaces ge-0/0/1 unit 0]", 
+            "+     family inet {", 
+            "+         address 172.31.30.62/24;", 
+            "+     }", 
+            "[edit]", 
+            "+  routing-instances {", 
+            "+      fwdd_vr {", 
+            "+          instance-type virtual-router;", 
+            "+          interface ge-0/0/0.0;", 
+            "+          interface ge-0/0/1.0;", 
+            "+          routing-options {", 
+            "+              static {", 
+            "+                  route 0.0.0.0/0 next-hop 172.31.30.1;", 
+            "+              }", 
+            "+          }", 
+            "+      }", 
+            "+  }"
+        ], 
+        "failed": false, 
+        "file": "./interfaces.conf", 
+        "msg": "Configuration has been: opened, loaded, checked, diffed, committed, closed."
+    }
+}
+
+PLAY RECAP *********************************************************************************************************************************************************************************************************
+54.146.136.192             : ok=3    changed=2    unreachable=0    failed=0   
+
+2019-12-31 13:03:17,890 [INFO] vsrx-aws: i-067098361fb68db5d:vSRX PC PIC 0 is online now
+2019-12-31 13:03:17,890 [INFO] vsrx-aws: Saving instance_id(i-067098361fb68db5d) to /tmp/88317.vsrx.id
++ '[' 0 -eq 0 ']'
+++ ./demo/tools/nginx_ecs_run.py --vpc-id vpc-03b9f1639fbb9c642 --subnet-name username-webtier-01 --profile saml
+Starting a nginx ECS task and wait it running...
++ nginx_private_ip=172.31.20.84
++ echo 'nginx task private ip address 172.31.20.84'
+nginx task private ip address 172.31.20.84
++ '[' 0 -eq 0 -a '!' -z 172.31.20.84 ']'
+++ cat /tmp/88317.vsrx.id
++ instance_id=i-067098361fb68db5d
++ ./vsrx-aws junos-config --instance-id i-067098361fb68db5d --key-file user-kp-virginia.pem --jinja2 --extra-vars web_server_ip=172.31.20.84 --profile saml demo/data/dst_nat_config.j2
+2019-12-31 13:04:01,113 [INFO] vsrx-aws: Configuring Junos ...
+2019-12-31 13:04:01,129 [INFO] vsrx-aws: Getting instance i-067098361fb68db5d variables
+2019-12-31 13:04:06,468 [INFO] vsrx-aws: docker run -it --rm -v "$(pwd)/ansible/playbook:/playbooks" -v "/Users/username/AWS Templates/path-vsrx-tool/aws_vsrx/user-kp-virginia.pem:/host-key.pem" -v /tmp/i-067098361fb68db5d-var.yml:/instance_var.yml -v "/Users/username/AWS Templates/path-vsrx-tool/aws_vsrx/demo/data/dst_nat_config.j2:/junos.conf.j2" -e ANSIBLE_NET_SSH_KEYFILE=/host-key.pem juniper/pyez-ansible ansible-playbook --user ec2-user --extra-vars 'web_server_ip=172.31.20.84' -i 54.146.136.192, configure_junos_j2.yml
+
+PLAY [Configure vSRX with Jinja2 template] *************************************************************************************************************************************************************************
+
+TASK [templating JUNOS configuration] ******************************************************************************************************************************************************************************
+changed: [54.146.136.192]
+
+TASK [Loading configuration] ***************************************************************************************************************************************************************************************
+changed: [54.146.136.192]
+
+TASK [Print the complete response.] ********************************************************************************************************************************************************************************
+ok: [54.146.136.192] => {
+    "response": {
+        "changed": true, 
+        "diff": "\n[edit security]\n+  address-book {\n+      global {\n+          address server-1 172.31.20.84/32;\n+      }\n+  }\n[edit security nat]\n+    destination {\n+        pool dst-nat-pool-1 {\n+            address 172.31.20.84/32;\n+        }\n+        rule-set rs1 {\n+            from interface ge-0/0/1.0;\n+            rule r1 {\n+                match {\n+                    destination-address 172.31.30.62/32;\n+                    destination-port {\n+                        80;\n+                    }\n+                }\n+                then {\n+                    destination-nat {\n+                        pool {\n+                            dst-nat-pool-1;\n+                        }\n+                    }\n+                }\n+            }\n+        }\n+    }\n[edit security policies]\n     from-zone trust to-zone untrust { ... }\n+    from-zone untrust to-zone trust {\n+        policy server-access {\n+            match {\n+                source-address any;\n+                destination-address server-1;\n+                application any;\n+            }\n+            then {\n+                permit;\n+            }\n+        }\n+    }\n", 
+        "diff_lines": [
+            "", 
+            "[edit security]", 
+            "+  address-book {", 
+            "+      global {", 
+            "+          address server-1 172.31.20.84/32;", 
+            "+      }", 
+            "+  }", 
+            "[edit security nat]", 
+            "+    destination {", 
+            "+        pool dst-nat-pool-1 {", 
+            "+            address 172.31.20.84/32;", 
+            "+        }", 
+            "+        rule-set rs1 {", 
+            "+            from interface ge-0/0/1.0;", 
+            "+            rule r1 {", 
+            "+                match {", 
+            "+                    destination-address 172.31.30.62/32;", 
+            "+                    destination-port {", 
+            "+                        80;", 
+            "+                    }", 
+            "+                }", 
+            "+                then {", 
+            "+                    destination-nat {", 
+            "+                        pool {", 
+            "+                            dst-nat-pool-1;", 
+            "+                        }", 
+            "+                    }", 
+            "+                }", 
+            "+            }", 
+            "+        }", 
+            "+    }", 
+            "[edit security policies]", 
+            "     from-zone trust to-zone untrust { ... }", 
+            "+    from-zone untrust to-zone trust {", 
+            "+        policy server-access {", 
+            "+            match {", 
+            "+                source-address any;", 
+            "+                destination-address server-1;", 
+            "+                application any;", 
+            "+            }", 
+            "+            then {", 
+            "+                permit;", 
+            "+            }", 
+            "+        }", 
+            "+    }"
+        ], 
+        "failed": false, 
+        "file": "/junos.conf", 
+        "msg": "Configuration has been: opened, loaded, checked, diffed, committed, closed."
+    }
+}
+
+PLAY RECAP *********************************************************************************************************************************************************************************************************
+54.146.136.192             : ok=3    changed=2    unreachable=0    failed=0   
+
+username-mbp:aws_vsrx username$ curl 3.233.231.155
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+

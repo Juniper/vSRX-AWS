@@ -1,0 +1,220 @@
+userch-mbp:aws_vsrx userch$ ./vsrx-aws deploy --region us-east-1                   --key-name userch-juniper-key                   --key-file userch-juniper-key.pem                   --config-file default.txt                   --nic subnet-0fa27de913ebab9ae,sg-067f30261c90c73e4,sg-0e21b3de087fb50fc                   --nic subnet-0ec1dcc0206ac667f,sg-067f30261c90c73e4                   --nic subnet-0e885ab7d318fb3cd,sg-067f30261c90c73e4                   --iam-role Cloudwatch-Logs-SecurityHub                   --cloudwatch                   --profile saml                   --fxp0-eip-auto                   ami-01aa83f02c97ac395
+2019-07-02 17:47:40,891 [INFO] vsrx-aws: One vSRX instance created
+2019-07-02 17:47:40,892 [INFO] vsrx-aws: Waiting instance ready ...
+2019-07-02 17:47:56,755 [INFO] vsrx-aws: Instance is running now
+2019-07-02 17:47:56,760 [INFO] vsrx-aws: Allocating elastic IP for interface(eni-0788daa1d67db9871)
+2019-07-02 17:47:59,921 [INFO] vsrx-aws: Associated elastic IP address 3.216.102.211 for fxp0
+2019-07-02 17:47:59,921 [DEBUG] vsrx-aws: {"AssociationId": "eipassoc-044b428f7f3e760a8", "ResponseMetadata": {"RetryAttempts": 0, "HTTPStatusCode": 200, "RequestId": "7f06e491-ff8b-43a7-871b-aa8f82e22031", "HTTPHeaders": {"date": "Tue, 02 Jul 2019 09:48:25 GMT", "content-length": "295", "content-type": "text/xml;charset=UTF-8", "server": "AmazonEC2"}}}
+2019-07-02 17:47:59,921 [INFO] vsrx-aws: Interface fxp0: IP address - 3.216.102.211
+2019-07-02 17:48:00,909 [INFO] vsrx-aws: Interface ge-0/0/1(device_idx 2): src/dst check disabled
+2019-07-02 17:48:01,870 [INFO] vsrx-aws: Interface ge-0/0/0(device_idx 1): src/dst check disabled
+2019-07-02 17:48:01,875 [INFO] vsrx-aws:     Instance ID.............................[i-0cf3ca203706e85ec]
+2019-07-02 17:48:02,282 [INFO] vsrx-aws:     Image ID................................[ami-01aa83f02c97ac395]
+2019-07-02 17:48:02,282 [INFO] vsrx-aws:     Instance type...........................[c5.large]
+2019-07-02 17:48:02,282 [INFO] vsrx-aws:     Architecture............................[x86_64]
+2019-07-02 17:48:02,282 [INFO] vsrx-aws:     Public IP...............................[3.216.102.211]
+2019-07-02 17:48:02,282 [INFO] vsrx-aws:     Key Name................................[userch-juniper-key]
+2019-07-02 17:48:02,282 [INFO] vsrx-aws:     VPC ID..................................[vpc-068c35a6409a957eb]
+2019-07-02 17:48:02,283 [INFO] vsrx-aws:     State...................................[running]
+2019-07-02 17:48:02,288 [INFO] vsrx-aws:     fxp0 - Status...........................[in-use]
+2019-07-02 17:48:02,288 [INFO] vsrx-aws:     fxp0 - Mac address......................[12:8b:96:bb:d4:08]
+2019-07-02 17:48:02,288 [INFO] vsrx-aws:     fxp0 - Private IPv4.....................[192.168.100.58]
+2019-07-02 17:48:02,288 [INFO] vsrx-aws:     fxp0 - Subnet ID........................[subnet-0fa27de913ebab9ae]
+2019-07-02 17:48:02,289 [INFO] vsrx-aws:     fxp0 - Groups...........................[sg-067f30261c90c73e4,sg-0e21b3de087fb50fc]
+2019-07-02 17:48:02,289 [INFO] vsrx-aws:     fxp0 - src/dst check....................[True]
+2019-07-02 17:48:02,291 [INFO] vsrx-aws:     ge-0/0/0 - Status.......................[in-use]
+2019-07-02 17:48:02,291 [INFO] vsrx-aws:     ge-0/0/0 - Mac address..................[12:28:30:f9:b3:12]
+2019-07-02 17:48:02,291 [INFO] vsrx-aws:     ge-0/0/0 - Private IPv4.................[192.168.10.51]
+2019-07-02 17:48:02,291 [INFO] vsrx-aws:     ge-0/0/0 - Subnet ID....................[subnet-0ec1dcc0206ac667f]
+2019-07-02 17:48:02,291 [INFO] vsrx-aws:     ge-0/0/0 - Groups.......................[sg-067f30261c90c73e4]
+2019-07-02 17:48:02,291 [INFO] vsrx-aws:     ge-0/0/0 - src/dst check................[False]
+2019-07-02 17:48:02,293 [INFO] vsrx-aws:     ge-0/0/1 - Status.......................[in-use]
+2019-07-02 17:48:02,293 [INFO] vsrx-aws:     ge-0/0/1 - Mac address..................[12:fc:df:9e:8e:80]
+2019-07-02 17:48:02,293 [INFO] vsrx-aws:     ge-0/0/1 - Private IPv4.................[192.168.30.30]
+2019-07-02 17:48:02,293 [INFO] vsrx-aws:     ge-0/0/1 - Subnet ID....................[subnet-0e885ab7d318fb3cd]
+2019-07-02 17:48:02,293 [INFO] vsrx-aws:     ge-0/0/1 - Groups.......................[sg-067f30261c90c73e4]
+2019-07-02 17:48:02,293 [INFO] vsrx-aws:     ge-0/0/1 - src/dst check................[False]
+2019-07-02 17:48:02,293 [INFO] vsrx-aws: Waiting vSRX ready ..
+
+2019-07-02 17:49:17,461 [INFO] vsrx-aws: i-0cf3ca203706e85ec:vSRX NETCONF is not ready, waiting 60s ...
+2019-07-02 17:50:31,612 [INFO] vsrx-aws: i-0cf3ca203706e85ec:vSRX is ready to configure
+2019-07-02 17:50:41,616 [INFO] vsrx-aws: Showing system information ...
+2019-07-02 17:50:41,616 [INFO] vsrx-aws: docker run -it --rm -v $PWD/ansible/playbook/:/playbooks -v /Users/userch/Documents/aws_vsrx/userch-juniper-key.pem:/host-key.pem -e ANSIBLE_NET_SSH_KEYFILE=/host-key.pem juniper/pyez-ansible ansible-playbook --user ec2-user -i 3.216.102.211, show_device_info.yml
+
+
+PLAY [Get device information] *************************************************************************************************************************************************************************************************
+
+TASK [Get software and uptime information] ************************************************************************************************************************************************************************************
+ok: [3.216.102.211]
+
+TASK [Print response] *********************************************************************************************************************************************************************************************************
+ok: [3.216.102.211] => {
+    "junos_result": {
+        "changed": false, 
+        "failed": false, 
+        "results": [
+            {
+                "changed": false, 
+                "command": "show version", 
+                "failed": false, 
+                "format": "text", 
+                "msg": "The command executed successfully.", 
+                "stdout": "\nModel: vSRX\nJunos: 19.3I20190613_0457_userch\nJUNOS OS Kernel 64-bit (WITNESS) [20190523.174929_fbsd-builder_stable_11]\nJUNOS OS libs [20190523.174929_fbsd-builder_stable_11]\nJUNOS OS runtime [20190523.174929_fbsd-builder_stable_11]\nJUNOS OS time zone information [20190523.174929_fbsd-builder_stable_11]\nJUNOS OS libs compat32 [20190523.174929_fbsd-builder_stable_11]\nJUNOS OS 32-bit compatibility [20190523.174929_fbsd-builder_stable_11]\nJUNOS py extensions [20190613.045717_userch_dev_common]\nJUNOS py base [20190612.104648_userch_dev_common]\nJUNOS OS vmguest [20190523.174929_fbsd-builder_stable_11]\nJUNOS OS support utilities [20190523.174929_fbsd-builder_stable_11]\nJUNOS OS crypto [20190523.174929_fbsd-builder_stable_11]\nJUNOS network stack and utilities [20190613.030734_userch_dev_common]\nJUNOS libs [20190612.104648_userch_dev_common]\nJUNOS libs compat32 [20190612.071645_userch_dev_common]\nJUNOS runtime [20190613.030734_userch_dev_common]\nJUNOS na telemetry [19.3I20190612_1046_userch]\nJUNOS Web Management Platform Package [20190613.030734_userch_dev_common]\nJUNOS vsrx modules [20190613.042906_userch_dev_common]\nJUNOS srx libs compat32 [20190613.030734_userch_dev_common]\nJUNOS srx runtime [20190613.042906_userch_dev_common]\nJUNOS srx platform support [20190613.030734_userch_dev_common]\nJUNOS common platform support [20190613.030734_userch_dev_common]\nJUNOS vsrx runtime [20190612.104648_userch_dev_common]\nJUNOS pppoe [20190612.104648_userch_dev_common]\nJUNOS Openconfig [19.3I20190605_1314_userch]\nJUNOS mtx network modules [20190612.104648_userch_dev_common]\nJUNOS modules [20190612.104648_userch_dev_common]\nJUNOS srx libs [20190612.071645_userch_dev_common]\nJUNOS srx Data Plane Crypto Support [20190613.030734_userch_dev_common]\nJUNOS daemons [20190613.030734_userch_dev_common]\nJUNOS srx daemons [20190612.104648_userch_dev_common]\nJUNOS SRX TVP AppQos Daemon [20190613.030734_userch_dev_common]\nJUNOS Extension Toolkit [20190613.045717_userch_dev_common]\nJUNOS Juniper Malware Removal Tool (JMRT) [1.0.0+20190605.131413_userch_dev_common]\nJUNOS J-Insight [20190612.104648_userch_dev_common]\nJUNOS jfirmware [20190612.104648_userch_dev_common]\nJUNOS Online Documentation [20190612.071645_userch_dev_common]\nJUNOS jail runtime [20190523.174929_fbsd-builder_stable_11]\nJUNOS FIPS mode utilities [20190612.104648_userch_dev_common]\n", 
+                "stdout_lines": [
+                    "", 
+                    "Model: vSRX", 
+                    "Junos: 19.3I20190613_0457_userch", 
+                    "JUNOS OS Kernel 64-bit (WITNESS) [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS OS libs [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS OS runtime [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS OS time zone information [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS OS libs compat32 [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS OS 32-bit compatibility [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS py extensions [20190613.045717_userch_dev_common]", 
+                    "JUNOS py base [20190612.104648_userch_dev_common]", 
+                    "JUNOS OS vmguest [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS OS support utilities [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS OS crypto [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS network stack and utilities [20190613.030734_userch_dev_common]", 
+                    "JUNOS libs [20190612.104648_userch_dev_common]", 
+                    "JUNOS libs compat32 [20190612.071645_userch_dev_common]", 
+                    "JUNOS runtime [20190613.030734_userch_dev_common]", 
+                    "JUNOS na telemetry [19.3I20190612_1046_userch]", 
+                    "JUNOS Web Management Platform Package [20190613.030734_userch_dev_common]", 
+                    "JUNOS vsrx modules [20190613.042906_userch_dev_common]", 
+                    "JUNOS srx libs compat32 [20190613.030734_userch_dev_common]", 
+                    "JUNOS srx runtime [20190613.042906_userch_dev_common]", 
+                    "JUNOS srx platform support [20190613.030734_userch_dev_common]", 
+                    "JUNOS common platform support [20190613.030734_userch_dev_common]", 
+                    "JUNOS vsrx runtime [20190612.104648_userch_dev_common]", 
+                    "JUNOS pppoe [20190612.104648_userch_dev_common]", 
+                    "JUNOS Openconfig [19.3I20190605_1314_userch]", 
+                    "JUNOS mtx network modules [20190612.104648_userch_dev_common]", 
+                    "JUNOS modules [20190612.104648_userch_dev_common]", 
+                    "JUNOS srx libs [20190612.071645_userch_dev_common]", 
+                    "JUNOS srx Data Plane Crypto Support [20190613.030734_userch_dev_common]", 
+                    "JUNOS daemons [20190613.030734_userch_dev_common]", 
+                    "JUNOS srx daemons [20190612.104648_userch_dev_common]", 
+                    "JUNOS SRX TVP AppQos Daemon [20190613.030734_userch_dev_common]", 
+                    "JUNOS Extension Toolkit [20190613.045717_userch_dev_common]", 
+                    "JUNOS Juniper Malware Removal Tool (JMRT) [1.0.0+20190605.131413_userch_dev_common]", 
+                    "JUNOS J-Insight [20190612.104648_userch_dev_common]", 
+                    "JUNOS jfirmware [20190612.104648_userch_dev_common]", 
+                    "JUNOS Online Documentation [20190612.071645_userch_dev_common]", 
+                    "JUNOS jail runtime [20190523.174929_fbsd-builder_stable_11]", 
+                    "JUNOS FIPS mode utilities [20190612.104648_userch_dev_common]"
+                ]
+            }, 
+            {
+                "changed": false, 
+                "command": "show system uptime", 
+                "failed": false, 
+                "format": "text", 
+                "msg": "The command executed successfully.", 
+                "stdout": "\nCurrent time: 2019-07-02 09:51:16 UTC\nTime Source:  LOCAL CLOCK \nSystem booted: 2019-07-02 09:49:12 UTC (00:02:04 ago)\nProtocols started: 2019-07-02 09:50:41 UTC (00:00:35 ago)\nLast configured: 2019-07-02 09:40:21 UTC (00:10:55 ago) by ec2-user\n 9:51AM  up 2 mins, 0 users, load averages: 2.19, 0.76, 0.30\n", 
+                "stdout_lines": [
+                    "", 
+                    "Current time: 2019-07-02 09:51:16 UTC", 
+                    "Time Source:  LOCAL CLOCK ", 
+                    "System booted: 2019-07-02 09:49:12 UTC (00:02:04 ago)", 
+                    "Protocols started: 2019-07-02 09:50:41 UTC (00:00:35 ago)", 
+                    "Last configured: 2019-07-02 09:40:21 UTC (00:10:55 ago) by ec2-user", 
+                    " 9:51AM  up 2 mins, 0 users, load averages: 2.19, 0.76, 0.30"
+                ]
+            }
+        ]
+    }
+}
+
+PLAY RECAP ********************************************************************************************************************************************************************************************************************
+3.216.102.211              : ok=2    changed=0    unreachable=0    failed=0   
+
+2019-07-02 17:50:51,139 [INFO] vsrx-aws: Configuring ge interfaces ...
+2019-07-02 17:50:51,143 [INFO] vsrx-aws: docker run -it --rm -v $PWD/ansible/playbook/:/playbooks -v /Users/userch/Documents/aws_vsrx/userch-juniper-key.pem:/host-key.pem -v /tmp/i-0cf3ca203706e85ec-interfaces.yml:/interfaces_var.yml -e ANSIBLE_NET_SSH_KEYFILE=/host-key.pem juniper/pyez-ansible ansible-playbook --user ec2-user -i 3.216.102.211, configure_interfaces.yml
+
+PLAY [Configure device interfaces] ********************************************************************************************************************************************************************************************
+
+TASK [template interfaces configuration] **************************************************************************************************************************************************************************************
+changed: [3.216.102.211]
+
+TASK [Configure interfaces] ***************************************************************************************************************************************************************************************************
+changed: [3.216.102.211]
+
+TASK [Print the complete response.] *******************************************************************************************************************************************************************************************
+ok: [3.216.102.211] => {
+    "response": {
+        "changed": true, 
+        "diff": "\n[edit]\n+  interfaces {\n+      ge-0/0/0 {\n+          unit 0 {\n+              family inet {\n+                  address 192.168.10.51/24;\n+              }\n+          }\n+      }\n+      ge-0/0/1 {\n+          unit 0 {\n+              family inet {\n+                  address 192.168.30.30/24;\n+              }\n+          }\n+      }\n+  }\n", 
+        "diff_lines": [
+            "", 
+            "[edit]", 
+            "+  interfaces {", 
+            "+      ge-0/0/0 {", 
+            "+          unit 0 {", 
+            "+              family inet {", 
+            "+                  address 192.168.10.51/24;", 
+            "+              }", 
+            "+          }", 
+            "+      }", 
+            "+      ge-0/0/1 {", 
+            "+          unit 0 {", 
+            "+              family inet {", 
+            "+                  address 192.168.30.30/24;", 
+            "+              }", 
+            "+          }", 
+            "+      }", 
+            "+  }"
+        ], 
+        "failed": false, 
+        "file": "./interfaces.conf", 
+        "msg": "Configuration has been: opened, loaded, checked, diffed, committed, closed."
+    }
+}
+
+PLAY RECAP ********************************************************************************************************************************************************************************************************************
+3.216.102.211              : ok=3    changed=2    unreachable=0    failed=0   
+
+2019-07-02 17:51:09,366 [INFO] vsrx-aws: Creating CloudWatch dashboard for instance i-0cf3ca203706e85ec, namespace vsrx-ns
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - RECPUUtil
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - DataPlaneCPU1Util
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - REMemoryUtil
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - DataplaneHeapMemoryUtil
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - DiskUtil
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - FlowSessionUtil
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - Ge000InputPPS,Ge000OutputPPS
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - Ge000InputKBPS,Ge000OutputKBPS
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - Ge001InputPPS,Ge001OutputPPS
+2019-07-02 17:51:09,370 [INFO] vsrx-aws: Adding line widget for metrics - Ge001InputKBPS,Ge001OutputKBPS
+2019-07-02 17:51:11,512 [DEBUG] vsrx-aws: put_dashboard response:{"ResponseMetadata": {"RetryAttempts": 0, "HTTPStatusCode": 200, "RequestId": "fc188ac4-9cae-11e9-8f4f-7738c4f7378d", "HTTPHeaders": {"x-amzn-requestid": "fc188ac4-9cae-11e9-8f4f-7738c4f7378d", "date": "Tue, 02 Jul 2019 09:51:37 GMT", "content-length": "292", "content-type": "text/xml"}}, "DashboardValidationMessages": []}
+2019-07-02 17:51:11,513 [INFO] vsrx-aws: Created CloudWatch dashboard vsrx_i-0cf3ca203706e85ec
+2019-07-02 17:51:11,513 [INFO] vsrx-aws: Configuring CloudWatch on device ...
+2019-07-02 17:51:11,513 [INFO] vsrx-aws: docker run -it --rm -v $PWD/ansible/playbook/:/playbooks -v /Users/userch/Documents/aws_vsrx/userch-juniper-key.pem:/host-key.pem -e ANSIBLE_NET_SSH_KEYFILE=/host-key.pem juniper/pyez-ansible ansible-playbook --user ec2-user -i 3.216.102.211, configure_cloudwatch.yml
+
+PLAY [Configure AWS CloudWatch] ***********************************************************************************************************************************************************************************************
+
+TASK [Configure security cloud aws] *******************************************************************************************************************************************************************************************
+changed: [3.216.102.211]
+
+TASK [Print the config changes.] **********************************************************************************************************************************************************************************************
+ok: [3.216.102.211] => {
+    "response.diff_lines": [
+        "", 
+        "[edit]", 
+        "+  security {", 
+        "+      cloud {", 
+        "+          aws {", 
+        "+              cloudwatch {", 
+        "+                  metric {", 
+        "+                      collect-interval 1;", 
+        "+                      namespace vsrx-ns;", 
+        "+                  }", 
+        "+              }", 
+        "+          }", 
+        "+      }", 
+        "+  }"
+    ]
+}
+
+PLAY RECAP ********************************************************************************************************************************************************************************************************************
+3.216.102.211              : ok=2    changed=1    unreachable=0    failed=0   
+

@@ -1,0 +1,31 @@
+
+
+
+./vsrx-aws deploy --region us-east-1 \
+                  --key-name user-key \
+                  --key-file user-key.pem \
+                  --config-file default.txt \
+                  --nic subnet-0fa27de913ebab9ae,sg-067f30261c90c73e4,sg-0e21b3de087fb50fc \
+                  --nic subnet-0ec1dcc0206ac667f,sg-067f30261c90c73e4 \
+                  --nic subnet-0e885ab7d318fb3cd,sg-067f30261c90c73e4 \
+                  --iam-role Cloudwatch-Logs-SecurityHub \
+                  --cloudwatch \
+                  --profile saml \
+                  --fxp0-eip-auto \
+                  ami-06b424cccf70e6a94
+
+
+./vsrx-aws deploy --region us-east-1 \
+                  --key-name user-key \
+                  --key-file user-key.pem \
+                  --config-file default.txt \
+                  --nic subnet-0fa27de913ebab9ae,sg-067f30261c90c73e4,sg-0e21b3de087fb50fc \
+                  --nic subnet-0ec1dcc0206ac667f,sg-067f30261c90c73e4 \
+                  --nic subnet-0e885ab7d318fb3cd,sg-067f30261c90c73e4 \
+                  --iam-role Cloudwatch-Logs-SecurityHub \
+                  --cloudwatch \
+                  --profile saml \
+                  --fxp0-eip-auto \
+                  ami-01aa83f02c97ac395
+
+
