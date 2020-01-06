@@ -9,7 +9,7 @@ The tool is in its Beta stage and there is no planned effort to address any issu
 PREREQUISITE
 --------------
 
-1. Install python pacakges: click boto3 pyyaml tabulate
+1. Install python packages: click boto3 pyyaml tabulate
    #sudo pip install click boto3 pyyaml tabulate
 
 2. Install docker engine 
