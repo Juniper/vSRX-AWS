@@ -20,6 +20,37 @@ PREREQUISITE
 
   For Juniper SSO based SAML tokens:
   https://it-gitlab.junipercloud.net/cloud-platform/aws-samlapi
+  
+  (OR) 
+  
+   if you have an indvidual account, you need to execute these after installing aws-cli:
+ 
+#aws configure   # you will need to provide your access-key ID and secret-access-key as inputs; set the region and leave the format to json
+#aws sts get-session-token –duration-seconds 64000    #enter the duration you want to retain the tokens for
+ 
+  Once done, you will get an output such as:
+ 
+$ aws sts get-session-token --duration-seconds 6000
+{
+    "Credentials": {
+        "AccessKeyId": "AAAAAAH6ET44444444WG",
+        "SecretAccessKey": "mcem+B111111111111111111n7VjgitGi+jHefo",
+        "SessionToken": "FwoGZXIvYXdzEHIaDHKLw97y4O99UYO85yKBAasdfasdfasdfc69X8y2NUTwPeOElwwCA6dS2+PGjeinVdibTGWE9ON9PAUqb3scUg5YJ74DO8766rpiCRtClDV1Kf7I0NQPQQK3gAvHcVejp6wrQddGgrQfbX0xzPJLAEqbNh8mAtYZKWQhnq5w36L4AtG/NqTkmrTG9TXHkkSji2JXxBTIoU1jeIRXeHFFlRAT08yCzu7kUUsfGf4aXcF14/vjjkuI/oHaUy6cfpQ==",
+        "Expiration": "2020-01-20T10:41:22Z"
+    }
+}
+ 
+Next, you will need to edit ~/.aws/credentials and enter it in the below format:
+ 
+[profile_name]
+aws_access_key_id = AAAAAAH6ET44444444WG
+aws_secret_access_key = mcem+B1111111111111111n7VjgitGi+jHefo
+aws_session_token = FwoGZXIvYXdzEHIaDHKLw97y4O99UYO85yKBAasdfasdfasdfc69X8y2NUTwPeOElwwCA6dS2+PGjeinVdibTGWE9ON9PAUqb3scUg5YJ74DO8766rpiCRtClDV1Kf7I0NQPQQK3gAvHcVejp6wrQddGgrQfbX0xzPJLAEqbNh8mAtYZKWQhnq5w36L4AtG/NqTkmrTG9TXHkkSji2JXxBTIoU1jeIRXeHFFlRAT08yCzu7kUUsfGf4aXcF14/vjjkuI/oHaUy6cfpQ==
+aws_security_token = FwoGZXIvYXdzEHIaDHKLw97y4O99UYO85yKBAasdfasdfasdfc69X8y2NUTwPeOElwwCA6dS2+PGjeinVdibTGWE9ON9PAUqb3scUg5YJ74DO8766rpiCRtClDV1Kf7I0NQPQQK3gAvHcVejp6wrQddGgrQfbX0xzPJLAEqbNh8mAtYZKWQhnq5w36L4AtG/NqTkmrTG9TXHkkSji2JXxBTIoU1jeIRXeHFFlRAT08yCzu7kUUsfGf4aXcF14/vjjkuI/oHaUy6cfpQ==
+ 
+  When you execute the shell script or the command to launch vSRX on AWS, remember to set the argument for –profile to “profile_name” from the credentials file.
+  
+4. You may need to subscribe to the vSRX image at https://aws.amazon.com/marketplace/pp/B01MS9F1O0 for launching the preferred ami-ID
 
 
 INSTALLATION STEPS
@@ -48,7 +79,29 @@ Commands:
 EXAMPLE
 -------
 
-An example command to create a VPC, subnets, route-tables and deploy a vSRX instance is in the file "log.txt".
+Variables to be defined in the .sh file:
 
-One such complete execution of the tool is in the log.txt file. 
+prefix= 'your_name'
+KEY_NAME='key1'
+KEY_FILE='key1.pem'  <<<need to copy the key to the directory
+IMAGE_ID='ami-0f0442c45665d343a'
+PROFILE_OPTION='--profile profile_name'. <<< from the .aws/credentials file - use the profile name created in prerequisites
+
+./vsrx-aws deploy --instance-name "$INSTANCE_NAME" \
+                 --key-name "$KEY_NAME" \
+                 --key-file "$KEY_FILE" \
+                 --vpc-id "$vpc_id" \
+                 --nic subnet-name=$SUBNET_MGT,public-ip=auto \
+                 --nic subnet-name=$SUBNET_WEB,subnet-gateway=self \
+                 --nic subnet-name=$SUBNET_PUBLIC,public-ip=auto \
+                 --config-interface \
+                 --wait-fpc-online \
+                 --save-instance-id "$instance_id_file" \
+                 $PROFILE_OPTION \
+                 $VERBOSE_OPTION \
+                 $IMAGE_ID
+
+An example command to create a VPC, subnets, route-tables and deploy a vSRX instance is in the file awscli_sample.sh
+
+
 
