@@ -1,0 +1,70 @@
+NOTICES FOR THIRD-PARTY CODE/DEPENDENCIES
+
+Name:attrs
+ProjectURL: https://www.attrs.org/en/stable/
+License: https://www.attrs.org/en/stable/license.html
+
+Name:certifi
+ProjectURL: https://github.com/certifi/python-certifi
+License: https://github.com/certifi/python-certifi/blob/master/LICENSE
+
+Name:chardet
+ProjectURL: https://github.com/chardet/chardet
+License: https://github.com/chardet/chardet/blob/master/LICENSE
+
+Name:configparser
+ProjectURL: https://github.com/jaraco/configparser/
+License: https://github.com/jaraco/configparser/blob/master/LICENSE
+
+Name:contextlib2
+ProjectURL: https://github.com/jazzband/contextlib2/tree/v0.6.0
+License: https://github.com/jazzband/contextlib2/blob/v0.6.0/LICENSE.txt
+
+Name:functools32
+ProjectURL: https://github.com/MiCHiLU/python-functools32
+License: https://github.com/michilu/python-functools32/blob/master/LICENSE
+
+Name:idna
+ProjectURL: https://github.com/kjd/idna
+License: https://github.com/kjd/idna/blob/master/LICENSE.md
+
+Name:importlib_metadata
+ProjectURL: https://gitlab.com/python-devs/importlib_metadata
+License: https://gitlab.com/python-devs/importlib_metadata/-/blob/master/LICENSE
+
+Name:jsonschema
+ProjectURL:https://github.com/Julian/jsonschema
+License: https://github.com/Julian/jsonschema/blob/master/COPYING
+
+Name:pathlib2
+ProjectURL:https://github.com/mcmtroffaes/pathlib2
+License: https://github.com/mcmtroffaes/pathlib2/blob/develop/LICENSE.rst
+
+Name:pyrsistent
+ProjectURL:https://github.com/tobgu/pyrsistent/
+License: https://github.com/tobgu/pyrsistent/blob/master/LICENCE.mit
+
+Name:requests
+ProjectURL:https://requests.readthedocs.io/en/master/
+License: https://github.com/psf/requests/blob/master/LICENSE
+
+Name:scandir
+ProjectURL:https://github.com/benhoyt/scandir
+License: https://github.com/benhoyt/scandir/blob/master/LICENSE.txt
+
+Name:setuptools
+ProjectURL:https://github.com/pypa/setuptools
+License: https://github.com/pypa/setuptools/blob/master/LICENSE
+
+Name:six
+ProjectURL:https://github.com/benjaminp/six
+License: https://github.com/benjaminp/six/blob/1.15.0/LICENSE
+
+Name:urllib3
+ProjectURL:https://github.com/urllib3/urllib3
+License: https://github.com/urllib3/urllib3/blob/1.24.3/LICENSE.txt
+
+Name:zipp
+ProjectURL:https://github.com/jaraco/zipp
+License: https://github.com/jaraco/zipp/blob/v1.2.0/LICENSE
+

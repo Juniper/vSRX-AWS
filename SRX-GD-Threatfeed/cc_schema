@@ -1,0 +1,26 @@
+<?xml version="1.0" ?>
+<config category="CC" description="Command and Control data schema" version="c66b370237">
+  <type code="0" name="description"/>
+  <type code="1" group="dns" name="dn"/>
+  <type code="2" group="port" name="dst_port"/>
+  <type code="3" group="flow" name="flow_dir"/>
+  <type code="4" group="ip" name="ip_addr"/>
+  <type code="5" group="ip" name="ip_range"/>
+  <type code="6" group="port" name="src_port"/>
+  <type code="7" group="url" name="url"/>
+  <type code="60" group="ipv6" name="ipv6_addr"/>
+  <type code="61" group="ipv6" name="ipv6_range"/>
+  <type code="8" name="properties"/>
+  <type base="int" code="9" group="property" name="threat_level"/>
+  <property description="" name="threat_level">
+    <value_range max="10" min="0"/>
+  </property>
+  <actions>
+    <property name="threat_level" options="nooverride">
+      <default_action action="permit"/>
+      <trigger action="block" value="8"/>
+      <trigger action="block" value="9"/>
+      <trigger action="block" value="10"/>
+    </property>
+  </actions>
+</config>
