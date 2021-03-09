@@ -1,4 +1,4 @@
-Use of files in this repo are governed by the license contained within each separate directory with the file name “LICENSE.txt.”
+Use of files in this repo are governed by the license contained within each separate directory with the file name “LICENSE”
 
 If such a file does NOT exist within each directory then the below line is applicable to all content:
  
