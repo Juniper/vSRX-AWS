@@ -10,7 +10,7 @@ with open('LICENSE') as f:
     license = f.read()
 
 install_requires = [
-    'requests==2.21.0',
+    'requests==2.31.0',
     'jsonschema==3.2.0'
     ]
 
