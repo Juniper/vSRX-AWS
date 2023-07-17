@@ -1,0 +1,1378 @@
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
+
+---
+# Juniper Networks vSRX cloud formation template to launch the following resources in AWS
+#            * Creates a security VPC by taking the CIDR as params
+#            * Creates a mgmt, data, gwlbe, tgw subnet
+#            * Launches the vSRX, attaches fxp0 to mgmt subnet, ge-x/x/x interface to data interface
+#            * Create gwlb endpoint in the gwlbe subnets
+#            * Launches the gateway load balancer in the data subnet of the security spoke.
+#            * Add the vSRX into the target group and as a listener to the GWLB.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: | 
+          Juniper Networks vSRX deployement with Gateway load balancer in a Security Appliance VPC
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "vSRX Appliance Security VPC CIDR"
+        Parameters: 
+          - VpcCidrP
+      - Label:
+          default: "vSRX Appliance Security VPC Network Configuration - AZ 1"
+        Parameters: 
+          - Az1P
+          - MgmtCidrAz1P
+          - DataCidrAz1P
+          - GwlbeCidrAz1P
+          - TgwCidrAz1P
+      - Label:
+           default: "vSRX Appliance Security VPC Network Configuration - AZ 2"
+        Parameters: 
+          - Az2P
+          - MgmtCidrAz2P
+          - DataCidrAz2P 
+          - GwlbeCidrAz2P
+          - TgwCidrAz2P 
+      - Label:
+           default: "Transit gateway ID"
+        Parameters: 
+          - TgwIdP
+      - Label:
+          default: "Bastion Host in mgmt subnet"
+        Parameters: 
+          - BastionHostKeyPairP
+          - BastionHostAmiIdP
+          - BastionHostSgP
+      - Label:
+          default: "vSRX configuration"
+        Parameters:
+          - vSrxAmiIdP
+          - vSrxKeyPairP
+          - vSrxHostSgP
+          - vSrxInstanceTypeP
+          - vSrxGwlbHealthProtocolP
+          - vSrxGwlbHealthPortP
+      - Label:
+          default: "Preconfigured S3 bucket"
+        Parameters:
+          - s3BucketNameP
+          - s3LambdaZipP
+          - LogLevelP
+  
+    ParameterLabels:
+      # vSRX GWLB VPC Network Configuration Paramater Label
+      VpcCidrP:
+        default: "CIDR for the vSRX Security VPC"
+      # AZ-1 Network subnet configuration
+      Az1P:
+        default: "Select AZ-1 to launch vSRX"
+      MgmtCidrAz1P:
+        default: "CIDR for mgmt subnet in AZ-1 for vSRX"
+      DataCidrAz1P:
+        default: "CIDR for data subnet in AZ-1 for vSRX"
+      GwlbeCidrAz1P:
+        default: "CIDR for Gwlbe subnet in AZ-1"
+      TgwCidrAz1P:
+        default: "CIDR for Transit gateway attachment subnet in AZ-1"
+      # AZ-2 Network subnet configuration
+      Az2P:
+        default: "Select AZ-2 to launch vSRX"
+      MgmtCidrAz2P:
+        default: "CIDR for mgmt subnet in AZ-2 for vSRX"
+      DataCidrAz2P:
+        default: "CIDR for data subnet in AZ-2 for vSRX"
+      GwlbeCidrAz2P:
+        default: "CIDR for Gwlbe subnet in AZ-2"
+      TgwCidrAz2P:
+        default: "CIDR for Transit gateway attachment subnet in AZ-2"
+
+      # Transit gateway
+      TgwIdP:
+        default: "Transit gateway ID which is in appliance mode"
+
+      # Bastion Host Paramater Label
+      BastionHostKeyPairP:
+        default: "Choose keypair to manage bastion host"
+      BastionHostAmiIdP:
+        default: "AMI-ID for the bastion host for the region"
+      BastionHostSgP:
+        default: "CIDR or Source IP address to whitelist SSH access, the default is 0.0.0.0/0"
+        
+      # vSRX Paramater Label
+      vSrxAmiIdP:
+        default: "AMI-ID for the vSRX for the region"
+      vSrxKeyPairP:
+        default: "Choose keypair to manage vSRX"
+      vSrxHostSgP:
+        default: "CIDR or Source IP address to whitelist SSH access, the default is 0.0.0.0/0"
+      vSrxInstanceTypeP:
+        default: "Instance type for the vSRX default: c5.large"
+      vSrxGwlbHealthProtocolP:
+        default: "Health check Protocol to use with GWLB"
+      vSrxGwlbHealthPortP:
+        default: "Health check Port to use with GWLB"
+
+      # S3 bucket configuration
+      s3BucketNameP: 
+        default: "Preconfigured S3 bucket name which has vsrx_lambda code as zip file"
+      s3LambdaZipP:
+        default: "Preconfigured S3 bucket key which points to .zip file example: vsrx_lambda.zip"
+      LogLevelP:
+        default: "Log level for lambda function"
+
+Parameters:
+  VpcCidrP:
+    Description: "Security VPC CIDR"
+    Type: String
+    Default: "10.10.0.0/20"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Valid IP address in x.x.x.x/16-26 format"
+
+  Az1P:
+    Description: "Availability Zone - 1"
+    Type: AWS::EC2::AvailabilityZone::Name
+    ConstraintDescription: "Invalid Availability zone"
+
+  MgmtCidrAz1P:
+    Description: "Mgmt subnet CIDR - AZ 1"
+    Type: String
+    Default: "10.10.0.0/25"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+  
+  DataCidrAz1P:
+    Description: "Data subnet CIDR - AZ 1"
+    Type: String
+    Default: "10.10.1.0/25"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+  
+  GwlbeCidrAz1P:
+    Description: "GWLBe subnet CIDR - AZ 1"
+    Type: String
+    Default: "10.10.2.0/26"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+
+  TgwCidrAz1P:
+    Description: "TGW Subnet CIDR - AZ 1"
+    Type: String
+    Default: "10.10.2.128/26"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+
+  Az2P:
+    Description: "Availability Zone - 2"
+    Type: AWS::EC2::AvailabilityZone::Name
+    ConstraintDescription: "Select the valid Availability Zone"
+
+  MgmtCidrAz2P:
+    Description: "Mgmt subnet CIDR - AZ 2"
+    Type: String
+    Default: "10.10.0.128/25"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+  
+  DataCidrAz2P:
+    Description: "Data subnet CIDR - AZ 2"
+    Type: String
+    Default: "10.10.1.128/25"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+  
+  GwlbeCidrAz2P:
+    Description: "GWLBe subnet CIDR - AZ 2"
+    Type: String
+    Default: "10.10.2.64/26"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+
+  TgwCidrAz2P:
+    Description: "TGW Subnet CIDR - AZ 2"
+    Type: String
+    Default: "10.10.2.192/26"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+
+  TgwIdP:
+    Description: "TGW-ID in appliance mode"
+    Type: String
+    AllowedPattern: (tgw-[0-9A-Za-z]+)
+    ConstraintDescription: "Invalid TGW ID"
+
+  BastionHostAmiIdP:
+    Description: "AMI-ID for the bastion host"
+    Type: String
+    Default: ami-05fa00d4c63e32376 # ami-05fa00d4c63e32376 FreeTier linux in N Virginia
+    AllowedPattern: (ami\-[a-zA-Z0-9-]+)
+    ConstraintDescription: "Invalid AMI-ID for the bastion host"
+
+  BastionHostKeyPairP:
+    Description: "Keypair for bastion host management"
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: "Invalid key pair"
+
+  BastionHostSgP:
+    Description: "CIDR to whitelist IP address to allow SSH access to bastion host"
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})
+    ConstraintDescription: "Invalid IP address or CIDR"
+
+  vSrxAmiIdP:
+    Description: "AMI-ID for the vSRX"
+    Type: String
+    Default: ami-03f4fc6cdff195861
+    AllowedPattern: (ami\-[a-zA-Z0-9-]+)
+    ConstraintDescription: "Invalid AMI-ID for the vSRX"
+  
+  vSrxKeyPairP:
+    Description: "Keypair for vSRX management"
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: "Please select the existing keypair name to gain SSH access to the vSRX"
+
+  vSrxHostSgP:
+    Description: "CIDR to whitelist IP address to allow SSH access to vSRX"
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})
+    ConstraintDescription: "Invalid IP address or CIDR"
+
+  vSrxInstanceTypeP:
+    Description: "Select the instance type for vSRX"
+    Type: String
+    Default: c5.large
+    AllowedValues:
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+
+  vSrxGwlbHealthProtocolP:
+    Description: "Health check protocol"
+    Type: String
+    Default: TCP
+    AllowedValues:
+      - TCP
+      - HTTPS
+
+  vSrxGwlbHealthPortP:
+     Description: "Health check port number"
+     Type: String
+     Default: "49160"
+     AllowedValues:
+      - "49160"
+      - "443"
+
+  s3BucketNameP:
+    Description: "Preconfigured S3 bucket name with lambda function code zip"
+    Type: String
+    AllowedPattern: ([a-z0-9-.]+)
+    ConstraintDescription: "S3 bucket name only contains the lowercase letters, numbers, dots(.) and hyphens(-)"
+
+  s3LambdaZipP:
+    Description: "Preconfigured S3 bucket key to the lambda zip file"
+    Type: String
+    Default: vsrx_lambda.zip
+    AllowedPattern: (^[a-z0-9-_]+\.zip$)
+    ConstraintDescription: "Needs to be zip file that contains the vSRX lambda functions ( Allowed to have hyphens(-) and underscore (_)"
+
+  LogLevelP:
+    Description: "Log level for Lambda function"
+    Type: String
+    Default: info
+    AllowedValues:
+      - info
+      - debug
+      - none
+
+Conditions:
+   isRpmPortC: !And [!Equals [!Ref vSrxGwlbHealthProtocolP, "TCP"], !Equals [!Ref vSrxGwlbHealthPortP, "49160"]]
+
+Mappings:
+  LambdaFunction:
+    LambdaDefaults:
+      TimeOut: 600
+
+Resources:
+    VpcR:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: !Ref VpcCidrP
+        EnableDnsHostnames: true
+        EnableDnsSupport: true
+        InstanceTenancy: "default"
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-vpc'
+    
+    IgwR:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-vpc-igw'
+    
+    AttachIgwR:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref VpcR
+        InternetGatewayId: !Ref IgwR
+
+    AttachVpcR:
+      Type: AWS::EC2::TransitGatewayVpcAttachment
+      Properties: 
+        AddSubnetIds: 
+          - !Ref TgwSubnet1R
+          - !Ref TgwSubnet2R
+        Options: 
+          ApplianceModeSupport: enable
+        SubnetIds: 
+          - !Ref TgwSubnet1R
+          - !Ref TgwSubnet2R
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-tgw-attachment'
+        TransitGatewayId: !Ref TgwIdP
+        VpcId: !Ref VpcR
+    ################################################   AZ - 1  ################################################ 
+
+    MgmtSubnet1R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az1P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref MgmtCidrAz1P
+        MapPublicIpOnLaunch: true
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-mgmt-subnet'
+
+    DataSubnet1R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az1P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref DataCidrAz1P
+        MapPublicIpOnLaunch: false   
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-data-subnet'
+
+    GwlbeSubnet1R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az1P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref GwlbeCidrAz1P
+        MapPublicIpOnLaunch: false   
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-gwlbe-subnet'
+
+    TgwSubnet1R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az1P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref TgwCidrAz1P
+        MapPublicIpOnLaunch: false   
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-tgw-subnet'
+
+    MgmtRouteTable1R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-mgmt-route'
+        VpcId: !Ref VpcR
+    
+    DataRouteTable1R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-data-route'
+        VpcId: !Ref VpcR
+
+    GwlbeRouteTable1R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-gwlbe-route'
+        VpcId: !Ref VpcR
+    
+    TgwRouteTable1R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-tgw-route'
+        VpcId: !Ref VpcR
+
+    NatGwEip1R:
+      Type: AWS::EC2::EIP
+      Properties: 
+        Domain: vpc
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-natgw-eip'
+
+    NatGw1R:
+      Type: AWS::EC2::NatGateway
+      Properties: 
+        AllocationId: !GetAtt NatGwEip1R.AllocationId
+        ConnectivityType: public
+        SubnetId: !Ref MgmtSubnet1R
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az1P}-natgw'
+
+    MgmtSubnetRouteAssociation1R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref MgmtRouteTable1R
+        SubnetId: !Ref MgmtSubnet1R
+    
+    DataSubnetRouteAssociation1R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref DataRouteTable1R
+        SubnetId: !Ref DataSubnet1R
+
+    GwlbeSubnetRouteAssociation1R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref GwlbeRouteTable1R
+        SubnetId: !Ref GwlbeSubnet1R
+
+    TgwSubnetRouteAssociation1R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref TgwRouteTable1R
+        SubnetId: !Ref TgwSubnet1R
+
+    MgmtRouteTableEntryIGW1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable1R
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref IgwR
+      DependsOn: 
+        - AttachIgwR
+
+    MgmtRouteTableEntry10Sub1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable1R
+        DestinationCidrBlock: 10.0.0.0/8
+        VpcEndpointId: !Ref GwlbeEndPoint1R
+      DependsOn: 
+        - AttachIgwR
+
+    MgmtRouteTableEntry172Sub1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable1R
+        DestinationCidrBlock: 172.16.0.0/12
+        VpcEndpointId: !Ref GwlbeEndPoint1R
+      DependsOn: 
+        - AttachIgwR
+
+    MgmtRouteTableEntry192Sub1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable1R
+        DestinationCidrBlock: 192.168.0.0/16
+        VpcEndpointId: !Ref GwlbeEndPoint1R
+      DependsOn: 
+        - AttachIgwR
+
+    DataRouteTableEntryNAT1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref DataRouteTable1R
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGw1R
+    
+    GwlbeRouteTableEntryNAT1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable1R
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGw1R
+
+    GwlbeRouteTableEntry10Sub1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable1R
+        DestinationCidrBlock: 10.0.0.0/8
+        TransitGatewayId: !Ref TgwIdP
+      DependsOn: 
+      - AttachVpcR
+
+    GwlbeRouteTableEntry172Sub1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable1R
+        DestinationCidrBlock: 172.16.0.0/12
+        TransitGatewayId: !Ref TgwIdP
+      DependsOn: 
+      - AttachVpcR
+    
+    GwlbeRouteTableEntry192Sub1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable1R
+        DestinationCidrBlock: 192.168.0.0/16
+        TransitGatewayId: !Ref TgwIdP
+      DependsOn: 
+      - AttachVpcR
+
+    TgwRouteTableEntry1R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref TgwRouteTable1R
+        DestinationCidrBlock: 0.0.0.0/0
+        VpcEndpointId: !Ref GwlbeEndPoint1R
+
+    GwlbeEndPoint1R:
+      Type: AWS::EC2::VPCEndpoint
+      Properties: 
+        ServiceName: !GetAtt GwlbServiceNameR.gwlb_service_name
+        SubnetIds: 
+          - !Ref GwlbeSubnet1R
+        VpcEndpointType: "GatewayLoadBalancer"
+        VpcId: !Ref VpcR
+    
+    ################################################   AZ - 2  ################################################ 
+    MgmtSubnet2R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az2P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref MgmtCidrAz2P
+        MapPublicIpOnLaunch: true
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-mgmt-subnet'
+
+    DataSubnet2R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az2P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref DataCidrAz2P
+        MapPublicIpOnLaunch: false   
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-data-subnet'
+
+    GwlbeSubnet2R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az2P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref GwlbeCidrAz2P
+        MapPublicIpOnLaunch: false   
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-gwlbe-subnet'
+
+    TgwSubnet2R:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref Az2P
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref TgwCidrAz2P
+        MapPublicIpOnLaunch: false   
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-tgw-subnet'
+
+    MgmtRouteTable2R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-mgmt-route'
+        VpcId: !Ref VpcR
+    
+    DataRouteTable2R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-data-route'
+        VpcId: !Ref VpcR
+
+    GwlbeRouteTable2R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-gwlbe-route'
+        VpcId: !Ref VpcR
+    
+    TgwRouteTable2R:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-tgw-route'
+        VpcId: !Ref VpcR
+
+
+    NatGwEip2R:
+      Type: AWS::EC2::EIP
+      Properties: 
+        Domain: vpc
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-natgw-eip'
+
+    NatGw2R:
+      Type: AWS::EC2::NatGateway
+      Properties: 
+        AllocationId: !GetAtt NatGwEip2R.AllocationId
+        ConnectivityType: public
+        SubnetId: !Ref MgmtSubnet2R
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-${Az2P}-natgw'
+
+    MgmtSubnetRouteAssociation2R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref MgmtRouteTable2R
+        SubnetId: !Ref MgmtSubnet2R
+    
+    DataSubnetRouteAssociation2R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref DataRouteTable2R
+        SubnetId: !Ref DataSubnet2R
+
+    GwlbeSubnetRouteAssociation2R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref GwlbeRouteTable2R
+        SubnetId: !Ref GwlbeSubnet2R
+
+    TgwSubnetRouteAssociation2R:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref TgwRouteTable2R
+        SubnetId: !Ref TgwSubnet2R
+
+    MgmtRouteTableEntryIGW2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable2R
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref IgwR
+      DependsOn: 
+        - AttachIgwR
+
+    MgmtRouteTableEntry10Sub2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable2R
+        DestinationCidrBlock: 10.0.0.0/8
+        VpcEndpointId: !Ref GwlbeEndPoint2R
+      DependsOn: 
+        - AttachIgwR
+
+    MgmtRouteTableEntry172Sub2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable2R
+        DestinationCidrBlock: 172.16.0.0/12
+        VpcEndpointId: !Ref GwlbeEndPoint2R
+      DependsOn: 
+        - AttachIgwR
+
+    MgmtRouteTableEntry192Sub2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTable2R
+        DestinationCidrBlock: 192.168.0.0/16
+        VpcEndpointId: !Ref GwlbeEndPoint2R
+      DependsOn: 
+        - AttachIgwR
+
+    DataRouteTableEntryNAT2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref DataRouteTable2R
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGw2R
+
+    GwlbeRouteTableEntryNAT2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable2R
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGw2R
+
+    GwlbeRouteTableEntry10Sub2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable2R
+        DestinationCidrBlock: 10.0.0.0/8
+        TransitGatewayId: !Ref TgwIdP
+      DependsOn: 
+      - AttachVpcR
+    
+    GwlbeRouteTableEntry172Sub2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable2R
+        DestinationCidrBlock: 172.16.0.0/12
+        TransitGatewayId: !Ref TgwIdP
+      DependsOn: 
+      - AttachVpcR
+
+    GwlbeRouteTableEntry192Sub2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref GwlbeRouteTable2R
+        DestinationCidrBlock: 192.168.0.0/16
+        TransitGatewayId: !Ref TgwIdP
+      DependsOn: 
+      - AttachVpcR
+
+    TgwRouteTableEntry2R:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref TgwRouteTable2R
+        DestinationCidrBlock: 0.0.0.0/0
+        VpcEndpointId: !Ref GwlbeEndPoint2R
+
+    GwlbeEndPoint2R:
+      Type: AWS::EC2::VPCEndpoint
+      Properties: 
+        ServiceName: !GetAtt GwlbServiceNameR.gwlb_service_name
+        SubnetIds: 
+          - !Ref GwlbeSubnet2R
+        VpcEndpointType: "GatewayLoadBalancer"
+        VpcId: !Ref VpcR
+
+    ################################################   TGW route table  ################################################
+    TgwRouteTableR:
+      Type: AWS::EC2::TransitGatewayRouteTable
+      Properties: 
+        Tags: 
+           - Key: "Name"
+             Value: !Sub '${AWS::StackName}-vSRX-security-tgw-route'
+        TransitGatewayId: !Ref TgwIdP
+
+    TgwRouteTableAssociationR:
+      Type: AWS::EC2::TransitGatewayRouteTableAssociation
+      Properties: 
+        TransitGatewayAttachmentId: !Ref AttachVpcR
+        TransitGatewayRouteTableId: !Ref TgwRouteTableR
+    ################################################   Bastion host in AZ1  ################################################ 
+    BastionSGR:
+      Type: AWS::EC2::SecurityGroup
+      Properties: 
+        GroupDescription: "Security group for the mgmt subnet of the vSRX security VPC"
+        GroupName: !Sub '${AWS::StackName}-vSRX-bastion-host-sg'
+        VpcId: !Ref VpcR
+        SecurityGroupEgress: 
+          - CidrIp: 0.0.0.0/0
+            Description: "Egress rule to allow everything"
+            FromPort: -1
+            IpProtocol: "-1"
+            ToPort: -1
+        SecurityGroupIngress: 
+           - CidrIp: !Ref BastionHostSgP
+             Description: "Ingress rule to allow SSH"
+             FromPort: 22
+             IpProtocol: tcp
+             ToPort: 22
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-bastion-host-sg'
+  
+    BastionHostR:
+      Type: AWS::EC2::Instance
+      Properties:
+        AvailabilityZone: !Ref Az1P
+        ImageId: !Ref BastionHostAmiIdP
+        KeyName: !Ref BastionHostKeyPairP
+        InstanceType: t2.micro
+        SubnetId: !Ref MgmtSubnet1R
+        SecurityGroupIds:
+          - !Ref BastionSGR
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-bastion-host-mgmt-subnet'
+
+    vSrxSgMgmtR:
+      Type: AWS::EC2::SecurityGroup
+      Properties: 
+        GroupDescription: "Security group for the mgmt subnet of the vSRX security VPC"
+        GroupName: !Sub '${AWS::StackName}-vSRX-mgmt-sg'
+        VpcId: !Ref VpcR
+        SecurityGroupEgress: 
+          - CidrIp: 0.0.0.0/0
+            Description: "Egress rule to allow everything"
+            FromPort: -1
+            IpProtocol: "-1"
+            ToPort: -1
+        SecurityGroupIngress: 
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow SSH"
+             FromPort: 22
+             IpProtocol: tcp
+             ToPort: 22
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow http"
+             FromPort: 80
+             IpProtocol: tcp
+             ToPort: 80
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow https"
+             FromPort: 443
+             IpProtocol: tcp
+             ToPort: 443
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow ICMP"
+             FromPort: -1
+             IpProtocol: icmp
+             ToPort: -1
+
+           - CidrIp: !Ref MgmtCidrAz1P
+             Description: "Ingress rule to allow all traffic"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+           - CidrIp: !Ref MgmtCidrAz2P
+             Description:  "Ingress rule to allow all traffic"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+
+           - CidrIp: !Ref DataCidrAz1P
+             Description:  "Ingress rule to allow all traffic"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+           - CidrIp: !Ref DataCidrAz2P
+             Description:  "Ingress rule to allow all traffic"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-mgmt-sg'
+   
+    vSrxSgDataR:
+      Type: AWS::EC2::SecurityGroup
+      Properties: 
+        GroupDescription: "Security group for the private subnet of the vSRX security VPC"
+        GroupName: !Sub '${AWS::StackName}-vSRX-data-sg'
+        VpcId: !Ref VpcR
+        SecurityGroupEgress: 
+          - CidrIp: 0.0.0.0/0
+            Description: "Egress rule to allow everything"
+            FromPort: -1
+            IpProtocol: "-1"
+            ToPort: -1
+      # Allow all traffic from AZ1 and AZ2 data subnets
+        SecurityGroupIngress: 
+           - CidrIp: !Ref DataCidrAz1P
+             Description: "Ingress rule to allow all traffic - AZ1"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+           - CidrIp: !Ref DataCidrAz2P
+             Description: "Ingress rule to allow all traffic - AZ2"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+        
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-data-sg'
+    
+    vSrxBootRoleR:
+      Type: AWS::IAM::Role
+      Properties: 
+        Description: "IAM role for the vSRX instance boot cloud init"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - 'sts:AssumeRole'
+        Path: /
+        Policies: 
+          - PolicyName: !Sub '${AWS::StackName}-vSRX-boot-policy'
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement: # Allow Instance to access the S3 Bucket - Could be used for bootstrapping
+                - Effect: Allow
+                  Action: 
+                    - s3:GetObject
+                  Resource: !Sub 'arn:aws:s3:::${s3BucketNameP}/*'
+                  
+                - Effect: Allow # Allow Instance to post custom metrics for cloudWatch
+                  Action: 
+                    - cloudwatch:PutMetricData
+                    - cloudwatch:GetMetricData
+                    - cloudwatch:ListMetrics
+                    - cloudwatch:GetMetricStatistics
+                  Resource: "*"
+
+                - Effect: Allow # Allow Instance to describe Instance tags
+                  Action: 
+                    - ec2:DescribeTags
+                  Resource: "*"
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-boot-policy'
+
+    vSrxInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        Path: /
+        Roles:
+          - !Ref vSrxBootRoleR
+
+    vSrxLaunchTemplateR:
+      Type: AWS::EC2::LaunchTemplate
+      Properties:
+        LaunchTemplateName: !Sub '${AWS::StackName}-vSRX-launch-template'
+        LaunchTemplateData: 
+          MetadataOptions:
+             InstanceMetadataTags: enabled
+          IamInstanceProfile: 
+            Arn: !GetAtt  vSrxInstanceProfile.Arn
+          BlockDeviceMappings:
+            - DeviceName: /dev/sda1
+              Ebs:
+                VolumeSize: 20
+                DeleteOnTermination: true
+                VolumeType: "gp2"
+          ImageId: !Ref vSrxAmiIdP
+          InstanceType: !Ref vSrxInstanceTypeP
+          KeyName: !Ref vSrxKeyPairP
+
+          UserData: 
+            Fn::Base64:  
+                !Join
+                  - ''
+                  - - |
+                      #junos-config
+                      groups {
+                      aws-default-geneve {
+                      security {
+                          policies {
+                              from-zone AWS to-zone junos-host {
+                                  policy SELF {
+                                      match {
+                                          source-address any;
+                                          destination-address any;
+                                          application [ junos-geneve junos-http junos-tcp-any junos-https ];
+                                      }
+                                      then {
+                                          permit {
+                                              tunnel-inspection {
+                                                  AWS-inspection-profile;
+                                              }
+                                          }
+                                      }
+                                  }
+                                  policy SELF_DHCP {
+                                      match {
+                                          source-address any;
+                                          destination-address any;
+                                          application junos-dhcp-client;
+                                      }
+                                      then {
+                                          permit;
+                                      }
+                                  }
+                              }
+                              policy-set AWS-policy-set {
+                                  policy AWS-policy {
+                                      match {                 
+                                          source-address any; 
+                                          destination-address any;
+                                          application any;    
+                                      }                       
+                                      then {                  
+                                          permit;             
+                                      }                       
+                                  }                           
+                              }                               
+                          }                                   
+                          zones {                             
+                              security-zone AWS {             
+                                  host-inbound-traffic {      
+                                      system-services {       
+                                          http;               
+                                          https;              
+                                          rpm;                
+                                          dhcp;               
+                                      }                       
+                                      protocols {             
+                                          all;                
+                                      }                       
+                                  }                           
+                                  interfaces {                
+                                      ge-0/0/0.0;             
+                                  }                           
+                              }                               
+                          }                                   
+                          tunnel-inspection {                 
+                              inspection-profile AWS-inspection-profile {
+                                  geneve AWS-geneve-profile { 
+                                      policy-set AWS-policy-set;
+                                      vni AWS-vni;            
+                                  }                           
+                              }                               
+                              vni AWS-vni {
+                                  vni-id 0;
+                              }                 
+                          }
+                      }                                       
+                      interfaces {                         
+                          ge-0/0/0 {
+                              mtu 9120;                     
+                              unit 0 {                        
+                                  family inet {               
+                                      dhcp;                   
+                                  }                           
+                              }                               
+                          }                                   
+                      }
+
+                    # Separates the routing instance for Mgmt
+                    - |
+                      system {
+                            management-instance;
+                        }
+
+                    - |
+                      routing-instances {
+                        mgmt_junos {
+                            description "Mgmt_network";
+                        }
+                      }
+
+                    - !If
+                        - isRpmPortC
+                        - |
+                          services {
+                            rpm {
+                              probe-server {
+                                tcp {
+                                  port 49160
+                                }
+                              }
+                            }
+                          }
+                        - ''
+                    - |
+                      }
+                      }
+                      apply-groups aws-default-geneve;
+
+    vSrx1R:
+      Type: AWS::EC2::Instance
+      Properties:
+        AvailabilityZone: !Ref Az1P
+        LaunchTemplate:
+          LaunchTemplateId: !Ref vSrxLaunchTemplateR
+          Version:  !GetAtt vSrxLaunchTemplateR.LatestVersionNumber
+        NetworkInterfaces: 
+          - DeviceIndex: 0
+            GroupSet: 
+              - !Ref vSrxSgMgmtR
+            SubnetId: !Ref MgmtSubnet1R 
+              
+          - DeviceIndex: 1
+            GroupSet: 
+              - !Ref vSrxSgDataR
+            SubnetId: !Ref DataSubnet1R
+          
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-${Az1P}-vSRX'
+
+    vSrx2R:
+      Type: AWS::EC2::Instance
+      Properties:
+        AvailabilityZone: !Ref Az2P
+        LaunchTemplate:
+          LaunchTemplateId: !Ref vSrxLaunchTemplateR
+          Version:  !GetAtt vSrxLaunchTemplateR.LatestVersionNumber
+        NetworkInterfaces: 
+          - DeviceIndex: 0
+            GroupSet: 
+              - !Ref vSrxSgMgmtR
+            SubnetId: !Ref MgmtSubnet2R
+          
+          - DeviceIndex: 1
+            GroupSet: 
+              - !Ref vSrxSgDataR
+            SubnetId: !Ref DataSubnet2R
+        Tags:
+         - Key: "Name"
+           Value: !Sub '${AWS::StackName}-${Az2P}-vSRX'
+
+    vSrxLambdaRoleR:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+            - sts:AssumeRole
+        Path: "/"
+        ManagedPolicyArns: 
+          - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        Policies:
+        - PolicyName: !Sub '${AWS::StackName}-vSRX-lambda-iam-policies'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              Resource: arn:aws:logs:*:*:*
+            - Effect: Allow
+              Action:
+                - events:*
+                - elasticloadbalancing:*
+                - cloudformation:DescribeStacks
+              Resource: "*"
+ 
+    vSrxLambdaFunctionR:
+       Type: AWS::Lambda::Function
+       Properties: 
+        Architectures:
+          - x86_64
+        Code: 
+          S3Bucket: !Ref s3BucketNameP
+          S3Key: !Ref s3LambdaZipP
+        Description: "Lambda function to handle custom Resource"
+        Handler: vsrx_lambda.event_handler
+        PackageType: Zip
+        Role: !GetAtt vSrxLambdaRoleR.Arn
+        Runtime: python3.9
+
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-config-lambda-func'
+        Timeout: !FindInMap 
+          - LambdaFunction
+          - LambdaDefaults
+          - TimeOut
+
+        VpcConfig:
+          SecurityGroupIds:
+            - !Ref vSrxSgMgmtR
+            - !Ref vSrxSgDataR
+          SubnetIds:
+            - !Ref DataSubnet1R
+            - !Ref DataSubnet2R
+       DependsOn: 
+          - NatGw1R
+          - NatGw2R 
+          - DataSubnetRouteAssociation1R
+          - DataSubnetRouteAssociation2R
+          - DataRouteTableEntryNAT1R
+          - DataRouteTableEntryNAT2R
+          - MgmtSubnetRouteAssociation1R
+          - MgmtSubnetRouteAssociation2R
+          - MgmtRouteTableEntryIGW1R
+          - MgmtRouteTableEntryIGW2R
+          - AttachIgwR
+
+# Custom Resource configuration - Assigning EIP to the management interface
+    vSrxAssignEip1R:
+        Type: AWS::CloudFormation::CustomResource
+        Properties:
+          ServiceToken: !GetAtt vSrxLambdaFunctionR.Arn
+          # Common config vsrx params
+          region: !Ref AWS::Region
+          stack_name: !Ref AWS::StackName
+          log_level: !Ref LogLevelP
+          
+          # Specific to custom resource
+          cr_type: "alloc_and_attach_eip" # Mandatory field to indicate what action is required to be performed by lambda
+          instance_id: !Ref vSrx1R
+          dev_index: 0
+
+     # Custom Resource configuration - Fetch the data interface IP address
+    vSrxFetchDataIp1R:
+        Type: AWS::CloudFormation::CustomResource
+        Properties:
+          ServiceToken: !GetAtt vSrxLambdaFunctionR.Arn
+          # Common config vsrx params
+          region: !Ref AWS::Region
+          stack_name: !Ref AWS::StackName
+          log_level: !Ref LogLevelP
+          # Specific to custom resource
+          cr_type: "fetch_instance_ip" # Mandatory field to indicate what action is required to be performed by lambda
+          instance_id: !Ref vSrx1R
+          dev_index: 1    # Dev_index 1 is always the data interface
+          type: private   #Fetch the private IP of device index 1 (corresponds to eth1)
+
+    vSrxAssignEip2R:
+        Type: AWS::CloudFormation::CustomResource
+        Properties:
+          ServiceToken: !GetAtt vSrxLambdaFunctionR.Arn
+          # Common config vsrx params
+          region: !Ref AWS::Region
+          stack_name: !Ref AWS::StackName
+          log_level: !Ref LogLevelP
+          # Specific to custom resource
+          cr_type: "alloc_and_attach_eip" # Mandatory field to indicate what action is required to be performed by lambda
+          instance_id: !Ref vSrx2R
+          dev_index: 0
+
+     # Custom Resource configuration - Fetch the data interface IP address
+    vSrxFetchDataIp2R:
+        Type: AWS::CloudFormation::CustomResource
+        Properties:
+          ServiceToken: !GetAtt vSrxLambdaFunctionR.Arn
+          # Common config vsrx params
+          region: !Ref AWS::Region
+          stack_name: !Ref AWS::StackName
+          log_level: !Ref LogLevelP
+          # Specific to custom resource
+          cr_type: "fetch_instance_ip" # Mandatory field to indicate what action is required to be performed by lambda
+          instance_id: !Ref vSrx2R
+          dev_index: 1    # Dev_index 1 is always the data interface
+          type: private   #Fetch the private IP of device index 1 (corresponds to eth1)
+    GwlbR:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Type: gateway 
+        IpAddressType: ipv4          
+        Name: !Sub '${AWS::StackName}-vSRX-gwlb'
+        Subnets: 
+          - !Ref DataSubnet1R
+          - !Ref DataSubnet2R
+        LoadBalancerAttributes:
+          - Key: load_balancing.cross_zone.enabled
+            Value: true
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-gwlb'
+
+    GwlbTargetGroupR:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        Name: !Sub '${AWS::StackName}-tg'
+        HealthCheckPort: !Ref vSrxGwlbHealthPortP
+        HealthCheckProtocol: !Ref vSrxGwlbHealthProtocolP
+        UnhealthyThresholdCount: 3
+        TargetGroupAttributes:
+          - Key: deregistration_delay.timeout_seconds
+            Value: '10'
+        Port: 6081
+        Protocol: GENEVE
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-gwlb-target-group' 
+        Targets: 
+            - AvailabilityZone: !Ref Az1P
+              Id: !GetAtt vSrxFetchDataIp1R.interface_ip
+              Port: 6081
+            - AvailabilityZone: !Ref Az2P
+              Id: !GetAtt vSrxFetchDataIp2R.interface_ip
+              Port: 6081
+        TargetType: ip
+        VpcId: !Ref VpcR
+      DependsOn:  ["GwlbR", "vSrx1R","vSrx2R"]
+
+    vSrxListenerR:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref GwlbTargetGroupR
+        LoadBalancerArn: !Ref GwlbR
+    
+    GwlbEndPointR:
+      Type: AWS::EC2::VPCEndpointService
+      Properties: 
+        AcceptanceRequired: false
+        GatewayLoadBalancerArns: 
+          - !Ref GwlbR
+
+     # To fetch some resource info through lambda functions
+    GwlbServiceNameR:
+        Type: AWS::CloudFormation::CustomResource
+        Properties:
+          ServiceToken: !GetAtt vSrxLambdaFunctionR.Arn
+          # Common config vsrx params
+          region: !Ref AWS::Region
+          stack_name: !Ref AWS::StackName
+          log_level: !Ref LogLevelP
+          # Specific to custom resource input payload
+          cr_type: "get_resource_info" # Mandatory field to indicate what action is required to be performed by lambda
+          resource_type:
+            - 'gwlb_end_point_service_name'
+          service_id: !Ref GwlbEndPointR
+
+Outputs:
+  GwlbId:
+    Description: GWLB ID
+    Value: !Ref GwlbR
+  GwlbEndPointServices:
+    Description: GWLB Endpoint services name
+    Value: !GetAtt GwlbServiceNameR.gwlb_service_name
+  TransitGatewayId:
+    Description: Transit gateway ID
+    Value: !Ref TgwIdP
+  VpcSecurityAttachmentID:
+    Description: Security VPC - TGW attachment ID
+    Value: !Ref AttachVpcR
+  TgwRouteTableID:
+    Description: Transit gateway security attachment route table ID
+    Value: !Ref TgwRouteTableR
+...

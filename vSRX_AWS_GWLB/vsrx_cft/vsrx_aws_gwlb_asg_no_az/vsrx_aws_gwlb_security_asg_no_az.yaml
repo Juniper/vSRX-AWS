@@ -1,0 +1,1232 @@
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
+
+---
+# Juniper Network vSRX cloud formation template to launch the following resources in AWS
+#            * Creates a security VPC by taking the CIDR as params
+#            * Launches the vSRX by looking up the vSRX AMI ID that supports GENEVE encapsulation.
+#            * Creates a data and a mgmt subnet
+#            * Launches the vSRX management interface in the mgmt subnet
+#            * Launches one of the revenue interfaces in the data subnet.
+#            * Launches the gateway load balancer in the data subnet of the security spoke.
+#            * Add the vSRX into the target group and as a listener to the GWLB.
+AWSTemplateFormatVersion: 2010-09-09
+Description: | 
+          Juniper Network vSRX cloud formation template to launch a Simple VPC with mgmt and data subnet
+          along with the GWLB and vSRX
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "vSRX GWLB Security VPC Network Configuration"
+        Parameters: 
+          - VpcCidrP
+          - UseAzP
+          - MgmtCidrP
+          - DataCidrP
+
+      - Label:
+          default: "Bastion Host(Jump Server) in mgmt subnet"
+        Parameters:
+          - BastionHostKeyPairP
+          - BastionHostAmiIdP
+          - BastionHostSgP
+      - Label:
+          default: "vSRX configuration"
+        Parameters:
+          - vSrxAmiIdP
+          - vSrxKeyPairP
+          - vSrxHostSgP
+          - vSrxInstanceTypeP
+          - vSrxGwlbHealthProtocolP
+          - vSrxGwlbHealthPortP
+      - Label:
+          default: "S3 Bucket config"
+        Parameters:
+          - s3BucketNameP
+          - s3LambdaZipP
+          - LogLevelP
+      - Label:
+          default: "Auto scaling group"
+        Parameters:
+          - asgMinSizeP
+          - asgDesiredSizeP
+          - asgMaxSizeP
+      - Label:
+          default: "ASG - Scaling Policy Configuration"
+        Parameters:
+          - ScalingTypeP
+          - CloudWatchNameSpaceP
+          - MetricCollectIntervalP
+          - CpuThresholdP
+      - Label:
+          default: "ASG - Config Sync Mechanism"
+        Parameters:
+          - ConfigSyncP
+          - HouseKeepingTimeP
+
+    ParameterLabels:
+      # vSRX GWLB VPC Network Configuration Paramater Label
+      VpcCidrP:
+        default: "CIDR for the vSRX Security VPC"
+      UseAzP:
+        default: "Select AZ to launch vSRX"
+      MgmtCidrP:
+        default: "CIDR for mgmt subnet for vSRX"
+      DataCidrP:
+        default: "CIDR for data subnet for vSRX"
+      # Bastion Host Paramater Label
+      BastionHostKeyPairP:
+        default: "Choose existing keypair to manage bastion host"
+      BastionHostAmiIdP:
+        default: "AMI-ID for the bastion host for the region"
+      BastionHostSgP:
+        default: "CIDR or Source IP address to whitelist SSH access, the default is 0.0.0.0/0"
+      # vSRX Host Paramater Label
+      vSrxAmiIdP:
+        default: "AMI-ID for the vSRX for the region"
+      vSrxKeyPairP:
+        default: "Choose keypair to manage vSRX"
+      vSrxHostSgP:
+        default: "CIDR or Source IP address to whitelist SSH access, the default is 0.0.0.0/0"
+      vSrxInstanceTypeP:
+        default: "Instance type for the vSRX default: c5.large"
+      vSrxGwlbHealthProtocolP:
+        default: "Health check Protocol to use with GWLB"
+      vSrxGwlbHealthPortP:
+        default: "Health check Port to use with GWLB"
+
+      # S3 bucket configuration
+      s3BucketNameP: 
+        default: "Preconfigured S3 bucket name which has vsrx_lambda code as zip file"
+      s3LambdaZipP:
+        default: "Preconfigured S3 bucket key which points to .zip file example: vsrx_lambda.zip"
+      LogLevelP:
+        default: "Log level for lambda function"
+
+      # Autoscaling configuration
+      asgMinSizeP:
+        default: "Minimum number of vSRX instance in Autoscaling group"
+      asgDesiredSizeP:
+        default: "Desired number of vSRX instance in Autoscaling group"
+      asgMaxSizeP:
+        default: "Maximum number of vSRX instance in Autoscaling group"
+      
+      # Autoscaling - Scaling policies configuration
+      ScalingTypeP:
+        default: "Scaling policy type - if disable, no scaling policy will be configured"
+      CloudWatchNameSpaceP:
+        default: "Namespace for the cloudagent metric collections"
+      MetricCollectIntervalP:
+        default: "Collect Interval - Default 1 Min"
+      CpuThresholdP:
+        default: "Average Threshold for cpu utilization - ASG group"
+      # Config Sync across ASG mechanism
+      ConfigSyncP:
+        default: "Local config sync mechanism -  To keep vSRX config in sync"
+      HouseKeepingTimeP:
+        default: "Local config sync mechanism -  valid only when Local config sync is used (in minutes)"
+
+Parameters:
+  VpcCidrP:
+    Description: "Security VPC CIDR"
+    Type: String
+    Default: "192.168.1.0/24"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription:  "Valid IP address in x.x.x.x/16-26 format"
+
+  UseAzP:
+    Description: "Please choose the availability zone"
+    Type: AWS::EC2::AvailabilityZone::Name
+    ConstraintDescription: "Invalid Availability zone"
+
+  MgmtCidrP:
+    Description: "Mgmt subnet CIDR"
+    Type: String
+    Default: "192.168.1.0/25"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+  
+  DataCidrP:
+    Description: "Data subnet CIDR"
+    Type: String
+    Default: "192.168.1.128/25"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/((1[6-9])|(2[0-6])))
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/16-26 format"
+  
+  BastionHostAmiIdP:
+    Description: "Enter the AMI-ID for the bastion host"
+    Type: String
+    Default: ami-05fa00d4c63e32376 # ami-05fa00d4c63e32376 FreeTier linux in N Virginia
+    AllowedPattern: (ami\-[a-zA-Z0-9-]+)
+    ConstraintDescription: "Provide a valid ami ID for the bastion host"
+
+  BastionHostKeyPairP:
+    Description:  "Keypair for bastion host management"
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: "Invalid key pair"
+
+  BastionHostSgP:
+    Description: "CIDR to whitelist IP address to allow SSH access to bastion host"
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})
+    ConstraintDescription:  "Invalid IP address or CIDR"
+
+  vSrxAmiIdP:
+    Description: "Enter the AMI-ID for the vSRX"
+    Type: String
+    Default: ami-03f4fc6cdff195861
+    AllowedPattern: (ami\-[a-zA-Z0-9-]+)
+    ConstraintDescription: "Invalid AMI-ID for the vSRX"
+  
+  vSrxKeyPairP:
+    Description: "Choose the existing keypair for vSRX"
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: "Please select the existing keypair name to gain SSH access to the vSRX"
+
+  vSrxHostSgP:
+    Description: "Provide the CIDR to allow the SSH traffic from outside to vSRX management interface"
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})
+    ConstraintDescription: "Please specify the valid IP address in x.x.x.x/x format"
+
+  vSrxInstanceTypeP:
+    Description: "Provide the instance type for vSRX"
+    Type: String
+    Default: c5.large
+    AllowedValues:
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+
+  vSrxGwlbHealthProtocolP:
+    Description: "Health check protocol"
+    Type: String
+    Default: TCP
+    AllowedValues:
+      - TCP
+      - HTTPS
+
+  vSrxGwlbHealthPortP:
+     Description:  "Health check port number"
+     Type: String
+     Default: "49160"
+     AllowedValues:
+      - "49160"
+      - "443"
+
+  s3BucketNameP:
+    Description: "Preconfigured S3 bucket name with lambda function code zip"
+    Type: String
+    AllowedPattern: ([a-z0-9-.]+)
+    ConstraintDescription: "S3 bucket name only contains the lowercase letters, numbers, dots(.) and hyphens(-)"
+
+  s3LambdaZipP:
+    Description: "Preconfigured S3 bucket key to the lambda zip file"
+    Type: String
+    Default: vsrx_lambda.zip
+    AllowedPattern: (^[a-z0-9-_]+\.zip$)
+    ConstraintDescription: "Needs to be zip file that contains the vSRX lambda functions ( Allowed to have hyphens(-) and underscore (_)"
+
+  LogLevelP:
+    Description: "Log level for Lambda function"
+    Type: String
+    Default: info
+    AllowedValues:
+      - info
+      - debug
+      - none
+
+  # Auto scaling group related params
+  asgMinSizeP:
+    Description: "Minimum number of vSRX in Autoscaling group"
+    Type: Number
+    Default: 1
+   
+  asgDesiredSizeP:
+    Description: "desired number of vSRX in Autoscaling group"
+    Type: Number
+    Default: 1
+ 
+  asgMaxSizeP:
+    Description: "Maximum number of vSRX in Autoscaling group"
+    Type: Number
+    Default: 4
+
+  # Auto scaling - Saling policies
+  ScalingTypeP:
+    Description: "Autoscaling based on the CPU utilization"
+    Type: String
+    Default: simple_scaling
+    AllowedValues:
+      - simple_scaling
+      - target_scaling
+      - disable
+
+  CloudWatchNameSpaceP:
+    Description: "CloudWatch Namespace to push the metric from cloudagent"
+    Type: String
+    Default: vsrx_gwlb_asg_metric
+
+  CpuThresholdP:
+    Description: "Threshold for data cpu utilization"
+    Type: Number
+    Default: 50
+
+  MetricCollectIntervalP:
+    Description: "Metric interval time for Cloud agent in Min"
+    Type: Number
+    Default: 1
+
+  ConfigSyncP:
+    Description: |
+      "Local Config Sync tracks the vsrx_config.txt in s3bucket config/vsrx_config.txt in the series of set commands
+       - Adding   a valid set command adds to the vSRX device across ASG"
+       - Removing a valid set command removes from the vSRX device across ASG"
+    Type: String
+    Default: disable
+    AllowedValues:
+      - local_config_sync
+      - disable
+
+  HouseKeepingTimeP:
+     Description: "Housekeeping Lambda -- Lambda is triggered by a timer to check if the vSRX config is consistent across ASG"
+     Type: Number
+     Default: 30
+  
+Conditions:
+  isRpmPortC: !And [!Equals [!Ref vSrxGwlbHealthProtocolP, "TCP"], !Equals [!Ref vSrxGwlbHealthPortP, "49160"]]
+  isSimpleScalingC: !Equals [!Ref ScalingTypeP, "simple_scaling"]
+  isTargetScalingC: !Equals [!Ref ScalingTypeP, "target_scaling"]
+  isScalingC: !Or  [Condition: isSimpleScalingC , Condition: isTargetScalingC]
+  isLocalConfigC: !Equals [!Ref ConfigSyncP, "local_config_sync"]
+
+Mappings:
+  LambdaFunction:
+    LambdaDefaults:
+      TimeOut: 600
+
+Resources:
+    VpcR:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: !Ref VpcCidrP
+        EnableDnsHostnames: true
+        EnableDnsSupport: true
+        InstanceTenancy: "default"
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-vpc'
+    
+    IgwR:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-vpc-IGW'
+    
+    AttachIgwR:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref VpcR
+        InternetGatewayId: !Ref IgwR
+ 
+    MgmtSubnetR:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref UseAzP
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref MgmtCidrP
+        MapPublicIpOnLaunch: true
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-mgmt-subnet'
+
+    MgmtRouteTableR:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-mgmt-route'
+        VpcId: !Ref VpcR
+
+    NatGwEipR:
+      Type: AWS::EC2::EIP
+      Properties: 
+        Domain: vpc
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-natgw-eip'
+
+    NatGwR:
+      Type: AWS::EC2::NatGateway
+      Properties: 
+        AllocationId: !GetAtt NatGwEipR.AllocationId
+        ConnectivityType: public
+        SubnetId: !Ref MgmtSubnetR
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-natgw'
+  
+    MgmtRouteTableEntryR:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref MgmtRouteTableR
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref IgwR
+      DependsOn: 
+        - AttachIgwR
+
+    MgmtSubnetRouteAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref MgmtRouteTableR
+        SubnetId: !Ref MgmtSubnetR
+    
+    DataSubnetR:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: !Ref UseAzP
+        VpcId: !Ref VpcR
+        CidrBlock: !Ref DataCidrP
+        MapPublicIpOnLaunch: false   
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-data-subnet'
+    
+    DataRouteTableR:
+      Type: AWS::EC2::RouteTable
+      Properties: 
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-data-route'
+        VpcId: !Ref VpcR
+
+    DataSubnetRouteAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties: 
+        RouteTableId: !Ref DataRouteTableR
+        SubnetId: !Ref DataSubnetR
+
+    DataRouteTableEntryR:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref DataRouteTableR
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGwR
+
+    BastionSGR:
+      Type: AWS::EC2::SecurityGroup
+      Properties: 
+        GroupDescription: "Security group for the mgmt subnet of the vSRX security VPC"
+        GroupName: !Sub '${AWS::StackName}-vSRX-bastion-host-sg'
+        VpcId: !Ref VpcR
+        SecurityGroupEgress: 
+          - CidrIp: 0.0.0.0/0
+            Description: "Egress rule to allow everything"
+            FromPort: -1
+            IpProtocol: "-1"
+            ToPort: -1
+        SecurityGroupIngress: 
+           - CidrIp: !Ref BastionHostSgP
+             Description: "Ingress rule to allow SSH"
+             FromPort: 22
+             IpProtocol: tcp
+             ToPort: 22
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-bastion-host-sg'
+  
+    BastionHostR:
+      Type: AWS::EC2::Instance
+      Properties:
+        AvailabilityZone: !Ref UseAzP
+        ImageId: !Ref BastionHostAmiIdP
+        KeyName: !Ref BastionHostKeyPairP
+        InstanceType: t2.micro
+        SubnetId: !Ref MgmtSubnetR
+        SecurityGroupIds:
+          - !Ref BastionSGR
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-bastion-host-mgmt-subnet'
+
+    vSrxSgMgmtR:
+      Type: AWS::EC2::SecurityGroup
+      Properties: 
+        GroupDescription: "Security group for the mgmt subnet of the vSRX security VPC"
+        GroupName: !Sub '${AWS::StackName}-vSRX-mgmt-sg'
+        VpcId: !Ref VpcR
+        SecurityGroupEgress: 
+          - CidrIp: 0.0.0.0/0
+            Description: "Egress rule to allow everything"
+            FromPort: -1
+            IpProtocol: "-1"
+            ToPort: -1
+        SecurityGroupIngress: 
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow SSH"
+             FromPort: 22
+             IpProtocol: tcp
+             ToPort: 22
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow http"
+             FromPort: 80
+             IpProtocol: tcp
+             ToPort: 80
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow https"
+             FromPort: 443
+             IpProtocol: tcp
+             ToPort: 443
+           - CidrIp: !Ref vSrxHostSgP
+             Description: "Ingress rule to allow ICMP"
+             FromPort: -1
+             IpProtocol: icmp
+             ToPort: -1
+
+           - CidrIp: !Ref MgmtCidrP
+             Description: "Ingress rule to allow all traffic"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+           - CidrIp: !Ref DataCidrP
+             Description: "Ingress rule to allow all traffic"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+          
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-mgmt-sg'
+   
+    vSrxSgDataR:
+      Type: AWS::EC2::SecurityGroup
+      Properties: 
+        GroupDescription: "Security group for the data subnet of the vSRX security VPC"
+        GroupName: !Sub '${AWS::StackName}-vSRX-data-sg'
+        VpcId: !Ref VpcR
+        SecurityGroupEgress: 
+          - CidrIp: 0.0.0.0/0
+            Description: "Egress rule to allow everything"
+            FromPort: -1
+            IpProtocol: "-1"
+            ToPort: -1
+        SecurityGroupIngress: 
+           - CidrIp: !Ref DataCidrP
+             Description: "Ingress rule to allow all traffic"
+             FromPort: -1
+             IpProtocol: "-1"
+             ToPort: -1
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-data-sg'
+    
+    vSrxBootRoleR:
+      Type: AWS::IAM::Role
+      Properties: 
+        Description: "IAM role for the vSRX instance boot cloud init"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - 'sts:AssumeRole'
+        Path: /
+        Policies: 
+          - PolicyName: !Sub '${AWS::StackName}-vSRX-boot-policy'
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement: # Allow Instance to access the S3 Bucket - Could be used for bootstrapping
+                - Effect: Allow
+                  Action: 
+                    - s3:GetObject
+                  Resource: !Sub 'arn:aws:s3:::${s3BucketNameP}/*'
+                  
+                - Effect: Allow # Allow Instance to post custom metrics for cloudWatch
+                  Action: 
+                    - cloudwatch:PutMetricData
+                    - cloudwatch:GetMetricData
+                    - cloudwatch:ListMetrics
+                    - cloudwatch:GetMetricStatistics
+                  Resource: "*"
+
+                - Effect: Allow # Allow Instance to post custom metrics for cloudWatch
+                  Action: 
+                    - ec2:DescribeTags
+                  Resource: "*"
+
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-boot-policy'
+
+    vSrxInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        Path: /
+        Roles:
+          - !Ref vSrxBootRoleR
+
+    vSrxLaunchTemplateR:
+      Type: AWS::EC2::LaunchTemplate
+      Properties:
+        LaunchTemplateName: !Sub '${AWS::StackName}-vSRX-launch-template'
+        LaunchTemplateData:
+          MetadataOptions:
+             InstanceMetadataTags: enabled
+          IamInstanceProfile: 
+            Arn: !GetAtt  vSrxInstanceProfile.Arn
+          BlockDeviceMappings:
+            - DeviceName: /dev/sda1
+              Ebs:
+                VolumeSize: 20
+                DeleteOnTermination: true
+                VolumeType: "gp2"
+          ImageId: !Ref vSrxAmiIdP
+          InstanceType: !Ref vSrxInstanceTypeP
+          KeyName: !Ref vSrxKeyPairP
+          NetworkInterfaces:
+            - DeleteOnTermination: true
+              Description: !Sub '${AWS::StackName}-vSRX-data-interface'
+              DeviceIndex: 0
+              Groups:
+                - !Ref vSrxSgDataR
+              InterfaceType: interface
+
+          UserData: 
+            Fn::Base64: 
+              !Join
+                - ''
+                - - '#load_balancer=true'
+                  - |
+                    #junos-config
+                    groups {
+                    aws-default-geneve {
+                    security {
+                        policies {
+                            from-zone AWS to-zone junos-host {
+                                policy SELF {
+                                    match {
+                                        source-address any;
+                                        destination-address any;
+                                        application [ junos-geneve junos-http junos-tcp-any junos-https ];
+                                    }
+                                    then {
+                                        permit {
+                                            tunnel-inspection {
+                                                AWS-inspection-profile;
+                                            }
+                                        }
+                                    }
+                                }
+                                policy SELF_DHCP {
+                                    match {
+                                        source-address any;
+                                        destination-address any;
+                                        application junos-dhcp-client;
+                                    }
+                                    then {
+                                        permit;
+                                    }
+                                }
+                            }
+                            policy-set AWS-policy-set {
+                                policy AWS-policy {
+                                    match {                 
+                                        source-address any; 
+                                        destination-address any;
+                                        application any;    
+                                    }                       
+                                    then {                  
+                                        permit;             
+                                    }                       
+                                }                           
+                            }                               
+                        }                                   
+                        zones {                             
+                            security-zone AWS {             
+                                host-inbound-traffic {      
+                                    system-services {       
+                                        http;               
+                                        https;              
+                                        rpm;                
+                                        dhcp;               
+                                    }                       
+                                    protocols {             
+                                        all;                
+                                    }                       
+                                }                           
+                                interfaces {                
+                                    ge-0/0/0.0;             
+                                }                           
+                            }                               
+                        }                                   
+                        tunnel-inspection {                 
+                            inspection-profile AWS-inspection-profile {
+                                geneve AWS-geneve-profile { 
+                                    policy-set AWS-policy-set;
+                                    vni AWS-vni;            
+                                }                           
+                            }                               
+                            vni AWS-vni {                   
+                                vni-id 0;                   
+                            }                               
+                        }                                   
+                    }                                       
+                    interfaces {                         
+                        ge-0/0/0 {
+                            mtu 9120;                           
+                            unit 0 {                        
+                                family inet {               
+                                    dhcp;                   
+                                }                           
+                            }                               
+                        }                                   
+                    }
+
+                  # Separates the routing instance for Mgmt
+                  - |
+                      system {
+                            management-instance;
+                        }
+
+                  - |
+                      routing-instances {
+                        mgmt_junos {
+                            description "Mgmt_network";
+                        }
+                      }
+                
+                  - !If
+                      - isRpmPortC
+                      - |
+                        services {
+                          rpm {
+                            probe-server {
+                              tcp {
+                                port 49160
+                              }
+                            }
+                          }
+                        }
+                      - ''
+                  - !If
+                      - isScalingC
+                      - !Sub |
+                        security {
+                          cloud {
+                                  aws {
+                                    cloudwatch {
+                                      metric {
+                                        collect-interval ${MetricCollectIntervalP};
+                                        namespace ${CloudWatchNameSpaceP};
+                                    }
+                                  }
+                                }
+                            }
+                          }
+                      - ''
+                  - |
+                    }
+                    }
+                    apply-groups aws-default-geneve;
+
+    vSrxAsgLambdaRoleR:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+            - sts:AssumeRole
+        Path: "/"
+        ManagedPolicyArns: 
+          - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess 
+          - arn:aws:iam::aws:policy/CloudWatchFullAccess
+          - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        Policies:
+        - PolicyName: !Sub '${AWS::StackName}-vSRX-lambda-iam-policies'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              Resource: arn:aws:logs:*:*:*
+            - Effect: Allow
+              Action:
+                - events:*
+                - cloudwatch:*
+                - autoscaling:*
+                - elasticloadbalancing:*
+                - cloudformation:DescribeStacks
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:SendMessage
+                - sqs:GetQueueUrl
+                - sqs:DeleteMessage
+                - sqs:SetQueueAttributes
+                - sqs:ChangeMessageVisibility
+                - sqs:GetQueueAttributes
+              Resource: !Sub arn:aws:sqs:*:*:${SqsFifoQueueR.QueueName}
+            - Effect: Allow
+              Action: 
+                - s3:GetObject
+                - s3:GetBucketNotification
+                - s3:PutBucketNotification
+                - s3:GetBucketTagging
+                - s3:PutBucketTagging
+                - s3:PutObjectLegalHold
+                - s3:GetObjectLegalHold
+              Resource: 
+                - !Sub 'arn:aws:s3:::${s3BucketNameP}'
+                - !Sub 'arn:aws:s3:::${s3BucketNameP}/*'
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: "*"
+           
+    vSrxAsgLambdaR:
+       Type: AWS::Lambda::Function
+       Properties: 
+        Architectures: 
+          - x86_64
+        Code: 
+          S3Bucket: !Ref s3BucketNameP
+          S3Key: !Ref s3LambdaZipP
+        Description: "Lambda function to handle Auto scaling group events and configuration"
+        Handler: vsrx_lambda.event_handler
+        PackageType: Zip
+        Role: !GetAtt vSrxAsgLambdaRoleR.Arn
+        Runtime: python3.9
+        Environment:
+          Variables:
+            asg_name: !Sub '${AWS::StackName}-vSRX-ASG'
+            sqs_url: !GetAtt SqsFifoQueueR.QueueName
+            s3_bucket: !Ref s3BucketNameP
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-config-lambda-func'
+        Timeout: !FindInMap 
+          - LambdaFunction
+          - LambdaDefaults
+          - TimeOut
+
+        VpcConfig:
+          SecurityGroupIds:
+            - !Ref vSrxSgMgmtR
+            - !Ref vSrxSgDataR
+          SubnetIds:
+            - !Ref DataSubnetR
+       DependsOn: 
+          - NatGwR
+          - DataSubnetRouteAssociation
+          - DataRouteTableEntryR
+          - MgmtSubnetRouteAssociation
+          - MgmtRouteTableEntryR
+          - AttachIgwR
+          - SqsFifoQueueR
+
+    vSrxAsgR:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties:
+        AutoScalingGroupName: !Sub '${AWS::StackName}-vSRX-ASG'
+        AvailabilityZones: 
+          - !Ref UseAzP
+        MinSize: !Ref asgMinSizeP
+        DesiredCapacity: !Ref asgDesiredSizeP
+        DesiredCapacityType: units
+        MaxSize: !Ref asgMaxSizeP
+        HealthCheckGracePeriod: 780
+        HealthCheckType: ELB
+        LaunchTemplate: 
+            LaunchTemplateId: !Ref vSrxLaunchTemplateR
+            Version: !GetAtt  vSrxLaunchTemplateR.LatestVersionNumber
+        LifecycleHookSpecificationList:
+        # Lifecyle hooks for instance launch
+          -  DefaultResult: ABANDON
+             HeartbeatTimeout: 3600
+             LifecycleHookName: !Sub '${AWS::StackName}-vSRX-Launch'
+             LifecycleTransition: autoscaling:EC2_INSTANCE_LAUNCHING
+             NotificationMetadata: !Sub |
+              {
+                'log_level': '${LogLevelP}',
+                'gwlb_id': '${GwlbR}',
+                'gwlb_tg': '${GwlbTargetGroupR}',
+                'sqs_url': '${SqsFifoQueueR.QueueName}',
+                's3': '${s3BucketNameP}',
+                'config_sync_type': '${ConfigSyncP}',
+                'eni_list': ['mgmt'],
+                'mgmt_idx_at': '1',
+                'data_idx_at': '0',
+                'snet_info': {
+                   '${UseAzP}':{
+                      'mgmt': {'snet_id':'${MgmtSubnetR}', 'sg':'${vSrxSgMgmtR}', 'idx':'1', 'alloc_eip':'true'}
+                  }
+                }
+              }
+        # Lifecyle hooks for instance termination
+          -  DefaultResult: CONTINUE
+             HeartbeatTimeout: 600
+             LifecycleHookName: !Sub '${AWS::StackName}-vSRX-Terminate'
+             LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+             NotificationMetadata: !Sub |
+              {
+                'log_level': '${LogLevelP}',
+                'gwlb_id': '${GwlbR}',
+                'gwlb_tg': '${GwlbTargetGroupR}',
+                'sqs_url': '${SqsFifoQueueR.QueueName}',
+                's3': '${s3BucketNameP}',
+                'config_sync_type': '${ConfigSyncP}',
+                'eni_list': ['mgmt'],
+                'mgmt_idx_at': '1',
+                'data_idx_at': '0',
+                'snet_info': {
+                   '${UseAzP}':{
+                      'mgmt': {'snet_id':'${MgmtSubnetR}', 'sg':'${vSrxSgMgmtR}', 'idx':'1', 'alloc_eip':'true'}
+                  }
+                }
+              }
+        MetricsCollection: 
+          - Granularity: 1Minute
+            Metrics: 
+              - GroupMinSize
+              - GroupMaxSize
+              - GroupDesiredCapacity
+              - GroupInServiceInstances
+              - GroupTerminatingInstances
+        Tags:   # Tagging all the resources as meta-data, it could be used in the lambda function
+          - Key: Name
+            PropagateAtLaunch: True
+            Value: !Sub '${AWS::StackName}-ASG-vSRX'
+
+          ## This tag is important when configuring scaling policies
+          - !If
+              - isScalingC
+              - Key: AsgDimension
+                PropagateAtLaunch: True
+                Value: enable
+                
+              - Key: AsgDimension
+                PropagateAtLaunch: True
+                Value: disable
+          
+          - Key: GwlbId
+            PropagateAtLaunch: True
+            Value: !Ref GwlbR
+          
+          - Key: GwlbTg
+            PropagateAtLaunch: True
+            Value: !Ref GwlbTargetGroupR
+
+        VPCZoneIdentifier: 
+          - !Ref DataSubnetR
+        TargetGroupARNs:
+          - !Ref GwlbTargetGroupR
+      DependsOn:
+        - "vSrxAsgLambdaR"
+        - "asgRule"
+        - "GwlbR"
+        - "GwlbTargetGroupR"
+        - "SqsTriggerR"
+
+    asgRule: 
+      Type: AWS::Events::Rule
+      Properties: 
+        Description: "Event Bridge rule to trigger during the Launch/Terminate"
+        Name: !Sub '${AWS::StackName}-ASG-Rule'
+        EventPattern:
+          source: 
+            - "aws.autoscaling"
+          detail-type: 
+            - "EC2 Instance-launch Lifecycle Action"
+            - "EC2 Instance-terminate Lifecycle Action"
+          detail: 
+            AutoScalingGroupName: 
+              - !Sub '${AWS::StackName}-vSRX-ASG'
+        State: "ENABLED"
+        Targets: 
+          - Arn: !GetAtt vSrxAsgLambdaR.Arn
+            Id: "v1"
+
+    HouseKeepingR: 
+      Type: AWS::Events::Rule
+      Condition: isLocalConfigC
+      Properties:
+        Description: "Housekeeping lambda for local config sync"
+        EventBusName: default
+        Name: !Sub '${AWS::StackName}-Housekeeping-Rule'
+        ScheduleExpression: !Sub rate(${HouseKeepingTimeP} minutes)
+        State: ENABLED
+        Targets:
+          - Id: "v1"
+            Arn: !GetAtt vSrxAsgLambdaR.Arn
+            RetryPolicy:
+              MaximumRetryAttempts: 100
+            Input: !Sub |
+              {
+                "evnt_from": "house_keeping",
+                "log_level": "${LogLevelP}",
+                "gwlb_id": "${GwlbR}",
+                "gwlb_tg": "${GwlbTargetGroupR}",
+                "sqs_url": "${SqsFifoQueueR.QueueName}",
+                "s3_bucket": "${s3BucketNameP}",
+                "asg_name": "${vSrxAsgR}",
+                "config_sync_type": "${ConfigSyncP}"
+              }
+  
+    HouseKeeping: 
+      Type: AWS::Lambda::Permission
+      Condition: isLocalConfigC
+      Properties: 
+        FunctionName: !GetAtt vSrxAsgLambdaR.Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "events.amazonaws.com"
+        SourceArn: !GetAtt  HouseKeepingR.Arn
+
+    asgPermission: 
+      Type: AWS::Lambda::Permission
+      Properties: 
+        FunctionName: !GetAtt vSrxAsgLambdaR.Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "events.amazonaws.com"
+        SourceArn: !GetAtt  asgRule.Arn
+
+    s3Permission: 
+      Type: AWS::Lambda::Permission
+      Condition: isLocalConfigC
+      Properties: 
+        FunctionName: !GetAtt vSrxAsgLambdaR.Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "s3.amazonaws.com"
+        SourceArn: !Sub 'arn:aws:s3:::${s3BucketNameP}'
+
+       #To fetch some resource info through lambda functions
+    s3LambdaTriggerR:
+        Type: AWS::CloudFormation::CustomResource
+        Condition: isLocalConfigC
+        Properties:
+          ServiceToken: !GetAtt vSrxAsgLambdaR.Arn
+          # Common config vsrx params
+          region: !Ref AWS::Region
+          stack_name: !Ref AWS::StackName
+          log_level: !Ref LogLevelP
+          # Specific to custom resource input payload
+          cr_type: "s3_notification_trig" # Mandatory field to indicate what action is required to be performed by lambda
+          lambda_arn: !GetAtt vSrxAsgLambdaR.Arn
+          bucket_name: !Ref s3BucketNameP
+          prefix: "config/vsrx_config"
+          suffix: ".txt"
+          s3_event_type: "s3:ObjectCreated:*"
+          asg_name: !Ref vSrxAsgR
+          sqs_url: !GetAtt SqsFifoQueueR.QueueName
+        DependsOn: 
+          - s3Permission
+
+    TargetTrackingScalingR:
+      Type: AWS::AutoScaling::ScalingPolicy
+      Condition: isTargetScalingC
+      Properties:
+        AutoScalingGroupName: !Ref vSrxAsgR
+        PolicyType: TargetTrackingScaling
+        TargetTrackingConfiguration: 
+            CustomizedMetricSpecification: 
+                Dimensions: 
+                  - Name: AutoScalingGroupName
+                    Value: !Ref vSrxAsgR
+                MetricName: DataPlaneCPU1Util
+                Namespace: !Ref CloudWatchNameSpaceP
+                Statistic: Average
+            DisableScaleIn: false
+            TargetValue: !Ref CpuThresholdP
+
+    ScaleOutAsgR:
+      Type: 'AWS::AutoScaling::ScalingPolicy'
+      Condition: isSimpleScalingC
+      Properties:
+        AdjustmentType: ChangeInCapacity
+        AutoScalingGroupName: !Ref vSrxAsgR
+        Cooldown: '600'
+        PolicyType: SimpleScaling
+        ScalingAdjustment: 1
+        
+
+    ScaleInAsgR:
+      Type: 'AWS::AutoScaling::ScalingPolicy'
+      Condition: isSimpleScalingC
+      Properties:
+        AdjustmentType: ChangeInCapacity
+        AutoScalingGroupName: !Ref vSrxAsgR
+        Cooldown: '600'
+        PolicyType: SimpleScaling
+        ScalingAdjustment: -1
+             
+    ScaleOutAsgAlarmR:
+      Type: AWS::CloudWatch::Alarm
+      Condition: isSimpleScalingC
+      Properties: 
+        ActionsEnabled: True
+        AlarmActions: 
+          - !Ref ScaleOutAsgR
+        AlarmDescription: !Sub Scale out ASG when CPU > ${CpuThresholdP}
+        AlarmName: !Sub ${vSrxAsgR}-scale-out-alarm
+        ComparisonOperator: GreaterThanThreshold
+        Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref vSrxAsgR
+        EvaluationPeriods: 1
+        MetricName: DataPlaneCPU1Util
+        Unit: Percent
+        Period: 600
+        Statistic: Average
+        Namespace: !Ref CloudWatchNameSpaceP
+        Threshold: !Ref CpuThresholdP
+
+    ScaleInAsgAlarmR:
+      Type: AWS::CloudWatch::Alarm
+      Condition: isSimpleScalingC
+      Properties: 
+        ActionsEnabled: True
+        AlarmActions: 
+          - !Ref ScaleInAsgR
+        AlarmDescription: !Sub Scale in ASG when CPU < ${CpuThresholdP}
+        AlarmName: !Sub  ${vSrxAsgR}-scale-in-alarm
+        ComparisonOperator: LessThanOrEqualToThreshold
+        Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref vSrxAsgR
+        EvaluationPeriods: 1
+        MetricName: DataPlaneCPU1Util
+        Unit: Percent
+        Period: 1200
+        Statistic: Average
+        TreatMissingData: missing
+        Namespace: !Ref CloudWatchNameSpaceP
+        Threshold: !Ref CpuThresholdP
+
+    GwlbR:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Type: gateway 
+        IpAddressType: ipv4          
+        Name: !Sub '${AWS::StackName}-vSRX-gwlb'
+        Subnets: 
+          - !Ref DataSubnetR
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-gwlb'
+    
+    # Create target group with no targets - Targets will be added during the ASG launch by attaching a lifecyle hooks
+    GwlbTargetGroupR:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        Name: !Sub '${AWS::StackName}-tg'
+        HealthCheckPort: !Ref vSrxGwlbHealthPortP
+        HealthCheckProtocol: !Ref vSrxGwlbHealthProtocolP
+        UnhealthyThresholdCount: 3
+        TargetGroupAttributes:
+          - Key: deregistration_delay.timeout_seconds
+            Value: '10'
+
+        Port: 6081
+        Protocol: GENEVE
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-gwlb-target-group' 
+        TargetType: instance
+        VpcId: !Ref VpcR
+      DependsOn: ["GwlbR"]
+
+    vSrxListenerR:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref GwlbTargetGroupR
+        LoadBalancerArn: !Ref GwlbR
+    
+    GwlbEndPointR:
+      Type: AWS::EC2::VPCEndpointService
+      Properties: 
+        AcceptanceRequired: false
+        GatewayLoadBalancerArns: 
+          - !Ref GwlbR
+    
+    SqsFifoQueueR:
+      Type: AWS::SQS::Queue
+      Properties: 
+        ContentBasedDeduplication: true
+        DelaySeconds: 0
+        VisibilityTimeout: !FindInMap 
+          - LambdaFunction
+          - LambdaDefaults
+          - TimeOut
+        FifoQueue: true
+        QueueName: !Sub '${AWS::StackName}-vSRX-security-vpc.fifo'
+        RedriveAllowPolicy:
+          redrivePermission: denyAll
+        Tags: 
+          - Key: "Name"
+            Value: !Sub '${AWS::StackName}-vSRX-security-vpc.fifo'
+      
+    SqsTriggerR:
+      Type: AWS::Lambda::EventSourceMapping
+      Properties:
+        BatchSize: 1
+        Enabled: true
+        EventSourceArn: !GetAtt SqsFifoQueueR.Arn
+        FunctionName: !GetAtt  vSrxAsgLambdaR.Arn
+        FunctionResponseTypes: 
+          - ReportBatchItemFailures
+        ScalingConfig: 
+          MaximumConcurrency: !Ref asgDesiredSizeP # One lambda function per desired instance for concurrency
+
+     # To fetch some resource info through lambda functions
+    GwlbServiceNameR:
+        Type: AWS::CloudFormation::CustomResource
+        Properties:
+          ServiceToken: !GetAtt vSrxAsgLambdaR.Arn
+          # Common config vsrx params
+          region: !Ref AWS::Region
+          stack_name: !Ref AWS::StackName
+          log_level: !Ref LogLevelP
+          
+          # Specific to custom resource input payload
+          cr_type: "get_resource_info" # Mandatory field to indicate what action is required to be performed by lambda
+          resource_type:
+            - 'gwlb_end_point_service_name'
+          service_id: !Ref GwlbEndPointR
+
+Outputs:
+  GwlbId:
+    Description: GWLB ID
+    Value: !Ref GwlbR
+  GwlbEndPointServices:
+    Description: GWLB Endpoint services name
+    Value: !GetAtt GwlbServiceNameR.gwlb_service_name
+...
